@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Geo Map – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    #map { height: calc(100vh - 200px); min-height: 500px; border-radius: var(--radius); }
+    .map-layout { display: grid; grid-template-columns: 1fr 290px; gap: 16px; }
+    @media (max-width: 1000px) { .map-layout { grid-template-columns: 1fr; } .side-panel { display: none; } }
+    .map-controls-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+    .side-panel { display: flex; flex-direction: column; gap: 14px; }
+    .legend-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
+    .legend-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 0.8rem; border-bottom: 1px solid var(--border); }
+    .legend-row:last-child { border-bottom: none; }
+    .stat-mini { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .stat-mini:last-child { border-bottom: none; }
+    .loading-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(13,27,42,0.7); display: flex; align-items: center; justify-content: center; border-radius: var(--radius); z-index: 500; backdrop-filter: blur(4px); }
+    .map-wrap { position: relative; }
+    .my-loc-btn { position: absolute; bottom: 20px; left: 10px; z-index: 400; }
+    #station-count-badge { font-size: 0.75rem; color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+        <div class="page-header fade-in">
+          <div>
+            <h1>🌍 Global Geo-Spatial Pollution Map</h1>
+            <p>Live data from worldwide monitoring stations including all 1296+ Indian CPCB stations</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="station-count-badge">Loading stations...</span>
+            <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div class="map-controls-row fade-in">
+          <button class="btn btn-primary btn-sm" onclick="gotoMyLocation()">📍 My Location</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadIndia()">🇮🇳 All India Stations</button>
+          <button class="btn btn-secondary btn-sm" onclick="loadGlobal()">🌍 Global View</button>
+          <button class="btn btn-secondary btn-sm" id="heat-btn" onclick="toggleHeatmap()">🔥 Heatmap: ON</button>
+          <select class="form-control" id="type-filter" onchange="applyFilters()" style="width:auto">
+            <option value="all">All Pollution</option>
+            <option value="air">💨 Air Quality</option>
+            <option value="water">💧 Water</option>
+            <option value="noise">🔊 Noise</option>
+          </select>
+          <select class="form-control" id="aqi-filter" onchange="applyFilters()" style="width:auto">
+            <option value="all">All AQI Levels</option>
+            <option value="good">🟢 Good (≤50)</option>
+            <option value="moderate">🟡 Moderate (51–100)</option>
+            <option value="unhealthy">🟠 Unhealthy SG (101–150)</option>
+            <option value="critical">🔴 Unhealthy+ (>150)</option>
+          </select>
+          <div class="search-box" style="flex:1;max-width:260px">
+            <span class="search-icon">🔍</span>
+            <input class="form-control" id="map-search" placeholder="Search city or station..." onkeydown="if(event.key==='Enter') searchLocation()"/>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="searchLocation()">Go</button>
+        </div>
+
+        <div class="map-layout fade-in">
+          <div class="map-wrap">
+            <div id="map"></div>
+            <div id="map-loading" class="loading-overlay" style="display:none">
+              <div style="text-align:center;color:#fff">
+                <div class="spinner" style="width:40px;height:40px;margin:0 auto 14px"></div>
+                <div id="loading-msg">Loading stations...</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="side-panel">
+            <div class="card p-3">
+              <div class="chart-title mb-2">📍 Your Location AQI</div>
+              <div id="my-aqi-widget">
+                <div class="flex-center" style="height:80px"><div class="spinner"></div></div>
+              </div>
+            </div>
+
+            <div class="card p-3">
+              <div class="chart-title mb-2">🗺️ AQI Legend</div>
+              <div class="legend-row"><div class="legend-dot" style="background:#2E7D32"></div><span>Good (0–50)</span><span class="ml-auto" style="color:#2E7D32;font-weight:700">✓ Safe</span></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#F9A825"></div><span>Moderate (51–100)</span></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#EF6C00"></div><span>Unhealthy SG (101–150)</span></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#C62828"></div><span>Unhealthy (151–200)</span></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#6A1B9A"></div><span>Very Unhealthy (201–300)</span></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#880E4F"></div><span>Hazardous (300+)</span></div>
+              <div class="legend-row"><div class="legend-dot" style="background:#1565C0;border-radius:3px"></div><span>Our System Station</span></div>
+            </div>
+
+            <div class="card p-3">
+              <div class="chart-title mb-2">📊 Map Stats</div>
+              <div class="stat-mini"><span class="text-muted">Stations Loaded</span><strong id="stat-loaded">0</strong></div>
+              <div class="stat-mini"><span class="text-muted">Critical Zones</span><strong id="stat-critical" style="color:var(--danger)">0</strong></div>
+              <div class="stat-mini"><span class="text-muted">Good Zones</span><strong id="stat-good" style="color:var(--success)">0</strong></div>
+              <div class="stat-mini"><span class="text-muted">Data Source</span><strong>WAQI + Our DB</strong></div>
+            </div>
+
+            <div class="card p-3">
+              <div class="chart-title mb-2">🔔 Live Alerts</div>
+              <div id="map-alert-feed"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-3 mt-3 fade-in" style="font-size:0.82rem;color:var(--text-muted);display:flex;gap:24px;flex-wrap:wrap;align-items:center">
+          <span>📡 Data: <strong style="color:var(--text-primary)">World Air Quality Index (WAQI / aqicn.org)</strong></span>
+          <span>⏱️ Update frequency: <strong style="color:var(--text-primary)">Hourly</strong></span>
+          <span>🇮🇳 Indian stations: <strong style="color:var(--text-primary)">1296+ CPCB Network</strong></span>
+          <span>🌍 Global coverage: <strong style="color:var(--text-primary)">180+ countries</strong></span>
+          <a href="https://aqicn.org" target="_blank" style="color:var(--primary)">Learn more ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script src="assets/js/livedata.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script>
+initApp('Geo Map');
+
+let map, heatLayer, locationMarker;
+let allStations = [];   // All loaded WAQI stations data
+let waqiMarkers  = [];  // Leaflet markers for WAQI data
+let ourMarkers   = [];  // Our internal station markers
+let showHeat = true;
+let userCoords = null;
+
+// ─── Internal station data (our DB) ─────────────────────────────────────────
+const OUR_STATIONS = [
+  { name:'Delhi Air Station 1', type:'air', region:'Delhi', lat:28.6139, lng:77.2090, status:'critical', aqi:198 },
+  { name:'Mumbai Sea Water Monitor', type:'water', region:'Mumbai', lat:18.9388, lng:72.8354, status:'warning', aqi:null },
+  { name:'Pune Industrial Noise', type:'noise', region:'Pune', lat:18.5204, lng:73.8567, status:'critical', aqi:null },
+  { name:'Chennai Air Monitor', type:'air', region:'Chennai', lat:13.0827, lng:80.2707, status:'warning', aqi:85 },
+  { name:'Kolkata River Monitor', type:'water', region:'Kolkata', lat:22.5726, lng:88.3639, status:'warning', aqi:null },
+  { name:'Bangalore Air Station', type:'air', region:'Bangalore', lat:12.9716, lng:77.5946, status:'normal', aqi:55 },
+  { name:'Hyderabad Lake Monitor', type:'water', region:'Hyderabad', lat:17.3850, lng:78.4867, status:'normal', aqi:null },
+  { name:'Ahmedabad Noise Station', type:'noise', region:'Ahmedabad', lat:23.0225, lng:72.5714, status:'warning', aqi:null },
+  { name:'Jaipur Air Monitor', type:'air', region:'Jaipur', lat:26.9124, lng:75.7873, status:'warning', aqi:135 },
+  { name:'Lucknow River Station', type:'water', region:'Lucknow', lat:26.8467, lng:80.9462, status:'normal', aqi:null },
+];
+const OUR_INDUSTRIES = [
+  { name:'Tata Steel Plant', type:'Steel', region:'Jharkhand', lat:22.8046, lng:86.2029, status:'compliant' },
+  { name:'Reliance Petrochem', type:'Petrochemical', region:'Gujarat', lat:22.3072, lng:73.1812, status:'non-compliant' },
+  { name:'NTPC Power Plant', type:'Power', region:'UP', lat:25.5941, lng:85.1376, status:'compliant' },
+  { name:'Birla Cement Works', type:'Cement', region:'Rajasthan', lat:27.0238, lng:74.2179, status:'under_review' },
+  { name:'ACC Chemicals Ltd', type:'Chemical', region:'Maharashtra', lat:19.0760, lng:72.8777, status:'non-compliant' },
+  { name:'SAIL Iron Factory', type:'Steel', region:'West Bengal', lat:22.9868, lng:87.8550, status:'compliant' },
+];
+
+// ─── Map Init ────────────────────────────────────────────────────────────────
+function initMap(lat, lng) {
+  const isDark = localStorage.getItem('pn_theme') === 'dark';
+  map = L.map('map', { zoomControl: true }).setView([lat, lng], 5);
+  const tileLayer = isDark
+    ? L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution:'© OpenStreetMap © CartoDB' })
+    : L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' });
+  tileLayer.addTo(map);
+
+  // User location marker with pulsing ring
+  addLocationMarker(lat, lng);
+
+  // Add our internal stations
+  renderOurStations();
+
+  // Auto-load in viewport as user pans/zooms
+  let loadTimer;
+  map.on('moveend', () => {
+    clearTimeout(loadTimer);
+    loadTimer = setTimeout(loadStationsInView, 1000);
+  });
+
+  // Initial WAQI load
+  loadIndia();
+}
+
+function addLocationMarker(lat, lng) {
+  if (locationMarker) map.removeLayer(locationMarker);
+  const icon = L.divIcon({
+    html: `<div style="position:relative">
+      <div style="width:20px;height:20px;background:#00897B;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,137,123,0.5)"></div>
+      <div style="position:absolute;top:-5px;left:-5px;width:30px;height:30px;border:2px solid #00897B;border-radius:50%;animation:pulse-ring 2s infinite;opacity:0.5"></div>
+    </div>`,
+    iconSize: [20, 20], iconAnchor: [10, 10], className: ''
+  });
+  locationMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
+    .bindPopup(`<div class="map-popup"><h4>📍 Your Location</h4><div style="font-size:0.75rem;color:#90A4AE">${lat.toFixed(4)}, ${lng.toFixed(4)}</div></div>`);
+}
+
+// ─── WAQI Stations ───────────────────────────────────────────────────────────
+function showLoading(msg = 'Loading stations...') {
+  document.getElementById('map-loading').style.display = 'flex';
+  document.getElementById('loading-msg').textContent = msg;
+}
+function hideLoading() {
+  document.getElementById('map-loading').style.display = 'none';
+}
+
+async function loadIndia() {
+  showLoading('Loading 1296 Indian CPCB monitoring stations...');
+  map.setView([22, 80], 5);
+  const stations = await WAQI.getIndiaStations();
+  hideLoading();
+  renderWAQIStations(stations);
+  Toast.success(`✅ Loaded ${stations.length} Indian monitoring stations`);
+  document.getElementById('station-count-badge').textContent = `${stations.length} stations loaded`;
+}
+
+async function loadGlobal() {
+  showLoading('Loading global stations (may take a moment)...');
+  map.setView([25, 10], 2);
+  const stations = await WAQI.getStationsInBounds(-60, -180, 80, 180);
+  hideLoading();
+  renderWAQIStations(stations);
+  Toast.success(`✅ Loaded ${stations.length} global stations`);
+  document.getElementById('station-count-badge').textContent = `${stations.length} global stations loaded`;
+}
+
+async function loadStationsInView() {
+  const b = map.getBounds();
+  // Only auto-load if zoom level is reasonable
+  if (map.getZoom() < 4) return;
+  const stations = await WAQI.getStationsInBounds(b.getSouth(), b.getWest(), b.getNorth(), b.getEast());
+  if (stations.length) renderWAQIStations(stations);
+}
+
+// FIXED MARKER RENDERING BELOW
+function renderWAQIStations(stations) {
+  waqiMarkers.forEach(m => map.removeLayer(m));
+  waqiMarkers = [];
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+
+  allStations = stations;
+  const typeFilter = document.getElementById('type-filter')?.value || 'all';
+  const aqiFilter = document.getElementById('aqi-filter')?.value || 'all';
+
+  let good = 0, critical = 0;
+  const heatPts = [];
+
+  stations.forEach(s => {
+    const aqi = typeof s.aqi === 'number' ? s.aqi : null;
+    if (aqi == null) return;
+
+    if (aqiFilter === 'good' && aqi > 50) return;
+    if (aqiFilter === 'moderate' && (aqi < 51 || aqi > 100)) return;
+    if (aqiFilter === 'unhealthy' && (aqi < 101 || aqi > 150)) return;
+    if (aqiFilter === 'critical' && aqi <= 150) return;
+
+    const lvl = WAQI.aqiLevel(aqi);
+    if (aqi <= 50) good++; else if (aqi > 150) critical++;
+
+    heatPts.push([s.lat, s.lon, Math.min(1, aqi / 200)]);
+
+    const sz = showHeat ? 12 : Math.min(42, Math.max(22, 22 + aqi / 18));
+    const content = showHeat ? '' : aqi;
+    const opacity = showHeat ? '0.15' : '1';
+    const border = showHeat ? 'none' : '2px solid rgba(255,255,255,0.8)';
+
+    const icon = L.divIcon({
+      html: `<div style="background:${lvl.color};width:${sz}px;height:${sz}px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:${sz > 32 ? '0.68rem' : '0.6rem'};font-weight:800;border:${border};box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;opacity:${opacity}">${content}</div>`,
+      iconSize: [sz, sz], iconAnchor: [sz/2, sz/2], className: ''
+    });
+
+    const m = L.marker([s.lat, s.lon], { icon }).addTo(map);
+    m.bindPopup(`<div class="map-popup">
+      <h4 style="font-size:0.88rem;margin:0 0 8px">${s.station?.name || 'Monitoring Station'}</h4>
+      <div style="font-size:2rem;font-weight:900;color:${lvl.color};font-family:'Poppins',sans-serif;line-height:1">${aqi}</div>
+      <div style="font-size:0.78rem;color:${lvl.color};font-weight:700;margin:4px 0">${lvl.emoji} ${lvl.label}</div>
+      <div style="font-size:0.7rem;color:#90A4AE;margin-top:6px">
+        📍 ${s.lat?.toFixed(3)}, ${s.lon?.toFixed(3)}<br/>
+        🕐 Live AQI Data · WAQI
+      </div>
+    </div>`);
+    waqiMarkers.push(m);
+  });
+
+  document.getElementById('stat-loaded').textContent = stations.length;
+  document.getElementById('stat-critical').textContent = critical;
+  document.getElementById('stat-good').textContent = good;
+
+  if (showHeat && typeof L.heatLayer === 'function') {
+    heatLayer = L.heatLayer(heatPts, { 
+        radius: 35, 
+        blur: 25, 
+        maxZoom: 10,
+        gradient: { 0.2:'#2E7D32', 0.5:'#F9A825', 0.8:'#C62828', 1:'#6A1B9A' } 
+    }).addTo(map);
+  }
+}
+
+// ─── Our Internal Stations ───────────────────────────────────────────────────
+function renderOurStations() {
+  ourMarkers.forEach(m => map.removeLayer(m));
+  ourMarkers = [];
+  const typeFilter = document.getElementById('type-filter')?.value || 'all';
+  const icons = { air:'💨', water:'💧', noise:'🔊' };
+  const sColors = { normal:'#2E7D32', warning:'#F57C00', critical:'#C62828', maintenance:'#1565C0' };
+
+  OUR_STATIONS.filter(s => typeFilter === 'all' || s.type === typeFilter).forEach(s => {
+    const color = sColors[s.status] || '#546E7A';
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25)">${icons[s.type]||'📡'}</div>`,
+      iconSize:[34,34], iconAnchor:[17,17], className:''
+    });
+    const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+    m.bindPopup(`<div class="map-popup">
+      <h4>${icons[s.type]} ${s.name}</h4>
+      <div style="font-size:0.75rem;color:#546E7A;margin-bottom:8px">${s.region} · PrithviNet Station</div>
+      ${s.aqi ? `<div style="font-weight:700;color:${color};font-size:1.2rem">AQI: ${s.aqi}</div>` : ''}
+      <span style="font-size:0.72rem;padding:2px 8px;border-radius:10px;background:${color}22;color:${color};font-weight:700">${s.status}</span>
+    </div>`);
+    ourMarkers.push(m);
+  });
+
+  OUR_INDUSTRIES.forEach(ind => {
+    const color = { compliant:'#2E7D32', 'non-compliant':'#C62828', under_review:'#F57C00' }[ind.status] || '#546E7A';
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.95rem;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.2)">🏭</div>`,
+      iconSize:[28,28], iconAnchor:[14,14], className:''
+    });
+    const m = L.marker([ind.lat, ind.lng], { icon }).addTo(map);
+    m.bindPopup(`<div class="map-popup"><h4>🏭 ${ind.name}</h4><div style="font-size:0.78rem;color:#546E7A">${ind.type} · ${ind.region}</div><span style="font-size:0.72rem;padding:2px 8px;border-radius:10px;background:${color}22;color:${color};font-weight:700;margin-top:8px;display:inline-block">${ind.status}</span></div>`);
+    ourMarkers.push(m);
+  });
+}
+
+// ─── Controls ────────────────────────────────────────────────────────────────
+function applyFilters() {
+  renderOurStations();
+  renderWAQIStations(allStations);
+}
+
+function toggleHeatmap() {
+  showHeat = !showHeat;
+  document.getElementById('heat-btn').textContent = `🔥 Heatmap: ${showHeat ? 'ON' : 'OFF'}`;
+  applyFilters();
+}
+
+async function gotoMyLocation() {
+  try {
+    const loc = await LiveLocation.get();
+    map.setView([loc.lat, loc.lng], 10);
+    addLocationMarker(loc.lat, loc.lng);
+    Toast.success(`📍 Centered on ${loc.city}, ${loc.country}`);
+  } catch(e) { Toast.error('Could not get location'); }
+}
+
+async function searchLocation() {
+  const q = document.getElementById('map-search').value.trim();
+  if (!q) return;
+  showLoading(`Searching for "${q}"...`);
+  const results = await WAQI.search(q);
+  hideLoading();
+  if (results.length) {
+    const first = results[0];
+    const lat = first.station?.geo?.[0];
+    const lng = first.station?.geo?.[1];
+    if (lat && lng) {
+      map.setView([lat, lng], 10);
+      Toast.info(`Found: ${first.station?.name}`);
+    }
+  } else Toast.warning(`No stations found for "${q}"`);
+}
+
+async function refreshAll() {
+  Toast.info('Refreshing data...');
+  await loadStationsInView();
+  Toast.success('Map data refreshed');
+}
+
+// ─── Sidebar: My Location AQI ────────────────────────────────────────────────
+async function loadMyAQI() {
+  try {
+    const loc = await LiveLocation.get();
+    userCoords = loc;
+    const feed = await WAQI.getFeedByGeo(loc.lat, loc.lng);
+    const parsed = WAQI.parseData(feed);
+    const aqi = parsed?.aqi || feed?.aqi || '—';
+    const lvl = WAQI.aqiLevel(typeof aqi === 'number' ? aqi : null);
+
+    document.getElementById('my-aqi-widget').innerHTML = `
+      <div style="text-align:center">
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px">📍 ${loc.city}, ${loc.country}</div>
+        <div style="font-size:2.8rem;font-weight:900;color:${lvl.color};font-family:'Poppins',sans-serif">${aqi}</div>
+        <div style="font-size:0.8rem;font-weight:700;color:${lvl.color}">${lvl.emoji} ${lvl.label}</div>
+        ${parsed?.pm25 != null ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px">PM2.5: <strong>${parsed.pm25}</strong> µg/m³</div>` : ''}
+        ${parsed?.station ? `<div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px">📡 ${parsed.station.substring(0,35)}</div>` : ''}
+      </div>`;
+  } catch(e) {
+    document.getElementById('my-aqi-widget').innerHTML = '<p class="text-muted text-center" style="font-size:0.8rem;padding:10px">Enable location for live AQI</p>';
+  }
+}
+
+// ─── Load Alerts ─────────────────────────────────────────────────────────────
+async function loadMapAlerts() {
+  const res = await API.get('alerts', { limit: 4 });
+  const alerts = res.ok ? res.data.data : [];
+  const icons = { air:'💨', water:'💧', noise:'🔊', compliance:'🏭', system:'⚙️' };
+  const el = document.getElementById('map-alert-feed');
+  el.innerHTML = alerts.slice(0,3).map(a=>`
+    <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:1rem;flex-shrink:0">${icons[a.type]||'⚠️'}</span>
+      <div>
+        <div style="font-size:0.75rem;font-weight:600;line-height:1.4">${a.title}</div>
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px">${Format.severityBadge(a.severity)}</div>
+      </div>
+    </div>`).join('') || '<p class="text-muted" style="font-size:0.78rem;text-align:center;padding:10px">No active alerts</p>';
+}
+
+// ─── Boot ────────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
+    const loc = await LiveLocation.get();
+    initMap(loc.lat, loc.lng);
+    Toast.info(`📍 Location detected: ${loc.city}`);
+  } catch(e) {
+    initMap(22, 80); // Default: India center
+    loadIndia();
+  }
+  loadMyAQI();
+  loadMapAlerts();
+}
+
+boot();
+</script>
+</body>
+</html>

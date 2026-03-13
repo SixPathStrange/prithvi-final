@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboard – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 24px; }
+    @media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px; }
+    @media (max-width: 1000px) { .charts-grid { grid-template-columns: 1fr; } }
+    .tables-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 900px) { .tables-grid { grid-template-columns: 1fr; } }
+    .chart-canvas-wrap { height: 280px; position: relative; }
+    .aqi-meter { text-align: center; padding: 20px 0; }
+    .aqi-gauge { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#2E7D32 0% 20%, #F57C00 20% 50%, #C62828 50% 80%, #6A1B9A 80% 100%); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; position: relative; }
+    .aqi-gauge-inner { width: 100px; height: 100px; border-radius: 50%; background: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .aqi-gauge-value { font-size: 1.8rem; font-weight: 800; color: var(--text-primary); font-family: 'Poppins',sans-serif; }
+    .aqi-gauge-label { font-size: 0.65rem; color: var(--text-muted); }
+    .recent-alert { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .recent-alert:last-child { border-bottom: none; }
+    .station-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .station-row:last-child { border-bottom: none; }
+    .station-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <div id="app-root">
+      <div class="main-content" id="main-content">
+        <div class="page-content">
+          <!-- KPI Cards -->
+          <div class="page-header fade-in">
+            <div><h1 id="page-title">Dashboard</h1><p id="page-sub">Welcome back — here's your environmental monitoring overview</p></div>
+            <div class="flex flex-gap-1">
+              <select class="form-control" id="region-filter" onchange="loadDashboard()" style="width:auto">
+                <option value="">All Regions</option>
+                <option>Raipur</option><option>Durg-Bhilai</option><option>Korba</option>
+                <option>Bilaspur</option><option>Raigarh</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- KPI Cards -->
+          <div class="kpi-grid">
+            <div class="card stat-card air fade-in fade-in-1">
+              <div class="stat-icon air">💨</div>
+              <div class="stat-body">
+                <div class="stat-label">Current AQI</div>
+                <div class="stat-value" id="kpi-aqi">—</div>
+                <div class="stat-sublabel" id="kpi-aqi-label">Loading...</div>
+                <div class="stat-change up" id="kpi-aqi-change">⬆ +12 from yesterday</div>
+              </div>
+            </div>
+            <div class="card stat-card water fade-in fade-in-2">
+              <div class="stat-icon water">💧</div>
+              <div class="stat-body">
+                <div class="stat-label">Avg Water BOD</div>
+                <div class="stat-value" id="kpi-bod">—</div>
+                <div class="stat-sublabel">mg/L — Safe limit: 30</div>
+                <div class="stat-change" id="kpi-bod-change">⬇ -5 improved</div>
+              </div>
+            </div>
+            <div class="card stat-card noise fade-in fade-in-3">
+              <div class="stat-icon noise">🔊</div>
+              <div class="stat-body">
+                <div class="stat-label">Noise Level</div>
+                <div class="stat-value" id="kpi-noise">—</div>
+                <div class="stat-sublabel">dB — Limit: 75 dB industrial</div>
+                <div class="stat-change down" id="kpi-noise-change">⬇ -3 better</div>
+              </div>
+            </div>
+            <div class="card stat-card danger fade-in fade-in-4">
+              <div class="stat-icon danger">🚨</div>
+              <div class="stat-body">
+                <div class="stat-label">Active Alerts</div>
+                <div class="stat-value" id="kpi-alerts">—</div>
+                <div class="stat-sublabel"><span id="kpi-critical">0</span> critical, <span id="kpi-unread">0</span> unread</div>
+                <div class="stat-change up">⬆ Requires attention</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts Row -->
+          <div class="charts-grid">
+            <div class="card p-3 fade-in">
+              <div class="chart-header">
+                <div class="chart-title">📊 7-Day Pollution Trend</div>
+                <div class="tabs" style="gap:4px; background:var(--bg); border-radius:8px; padding:3px">
+                  <button class="tab-btn active" style="padding:5px 12px;min-width:60px;font-size:0.78rem" onclick="switchTrendType('air',this)">Air</button>
+                  <button class="tab-btn" style="padding:5px 12px;min-width:60px;font-size:0.78rem" onclick="switchTrendType('water',this)">Water</button>
+                  <button class="tab-btn" style="padding:5px 12px;min-width:60px;font-size:0.78rem" onclick="switchTrendType('noise',this)">Noise</button>
+                </div>
+              </div>
+              <div class="chart-canvas-wrap"><canvas id="trend-chart"></canvas></div>
+            </div>
+            <div class="card p-3 fade-in fade-in-2">
+              <div class="chart-header"><div class="chart-title">🏛️ Compliance Status</div></div>
+              <div class="aqi-meter">
+                <div class="aqi-gauge">
+                  <div class="aqi-gauge-inner">
+                    <div class="aqi-gauge-value" id="gauge-aqi">198</div>
+                    <div class="aqi-gauge-label">AQI</div>
+                  </div>
+                </div>
+                <span id="gauge-label" class="badge badge-critical">Unhealthy</span>
+              </div>
+              <div class="chart-canvas-wrap" style="height:180px"><canvas id="compliance-chart"></canvas></div>
+            </div>
+          </div>
+
+          <!-- Tables Row -->
+          <div class="tables-grid">
+            <div class="card fade-in">
+              <div class="p-3" style="padding-bottom:0">
+                <div class="flex-between"><div class="chart-title">📡 Station Status</div><a href="monitoring.html" class="btn btn-sm btn-secondary">View All</a></div>
+              </div>
+              <div class="p-3" id="stations-list">
+                <div class="flex-center" style="height:100px"><div class="spinner"></div></div>
+              </div>
+            </div>
+            <div class="card fade-in fade-in-2">
+              <div class="p-3" style="padding-bottom:0">
+                <div class="flex-between"><div class="chart-title">🔔 Recent Alerts</div><a href="alerts.html" class="btn btn-sm btn-secondary">View All</a></div>
+              </div>
+              <div class="p-3" id="alerts-list">
+                <div class="flex-center" style="height:100px"><div class="spinner"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hourly Chart -->
+          <div class="card p-3 mt-3 fade-in">
+            <div class="chart-header"><div class="chart-title">⏱️ Today's Hourly Readings</div><span class="text-muted" style="font-size:0.8rem" id="last-updated">Updated just now</span></div>
+            <div class="chart-canvas-wrap"><canvas id="hourly-chart"></canvas></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/app.js"></script>
+  <script>
+    initApp('Dashboard');
+    const user = Auth.getUser();
+    if (user) {
+      document.getElementById('page-title').textContent = 'Dashboard';
+      document.getElementById('page-sub').textContent = `Welcome back, ${user.name} · ${(user.role||'').replace('_',' ')}`;
+    }
+
+    let trendChart, complianceChart, hourlyChart;
+    let currentTrendType = 'air';
+
+    async function loadDashboard() {
+      await Promise.all([loadKPIs(), loadTrendChart(), loadComplianceChart(), loadStations(), loadAlerts(), loadHourly()]);
+    }
+
+    async function loadKPIs() {
+      const res = await API.get('readings', { limit: 1 });
+      if (res.ok && res.data.kpi) {
+        const k = res.data.kpi;
+        const aqi = Math.round(k.avg_aqi || 198);
+        document.getElementById('kpi-aqi').textContent = aqi;
+        const aqiInfo = Format.aqiLabel(aqi);
+        document.getElementById('kpi-aqi-label').innerHTML = `<span class="badge aqi-badge ${aqiInfo.cls}">${aqiInfo.label}</span>`;
+        document.getElementById('kpi-bod').textContent = (k.avg_bod || 28.9).toFixed(1);
+        document.getElementById('kpi-noise').textContent = (k.avg_noise || 78.5).toFixed(0) + ' dB';
+        document.getElementById('kpi-alerts').textContent = k.critical_count || 5;
+        document.getElementById('kpi-critical').textContent = k.critical_count || 3;
+        document.getElementById('kpi-unread').textContent = k.warning_count || 4;
+        document.getElementById('gauge-aqi').textContent = aqi;
+        document.getElementById('gauge-label').innerHTML = `<span class="badge aqi-badge ${aqiInfo.cls}">${aqiInfo.label}</span>`;
+      }
+    }
+
+    async function loadTrendChart() {
+      const days = getLast7Days();
+      const demoData = DEMO.trendData;
+      const labels = { air: 'AQI', water: 'BOD (mg/L)', noise: 'Noise dB' };
+      const colors = { air: '#00897B', water: '#1565C0', noise: '#FF8F00' };
+      const data = demoData[currentTrendType];
+      const color = colors[currentTrendType];
+
+      if (trendChart) trendChart.destroy();
+      const opts = defaultChartOptions();
+      opts.scales.y.title = { display: true, text: labels[currentTrendType], color: opts.scales.y.ticks.color };
+      trendChart = new Chart(document.getElementById('trend-chart'), {
+        type: 'line',
+        data: {
+          labels: days,
+          datasets: [{
+            label: labels[currentTrendType],
+            data: data,
+            borderColor: color,
+            backgroundColor: color + '20',
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: color,
+            pointRadius: 5,
+            borderWidth: 2.5
+          }]
+        },
+        options: opts
+      });
+    }
+
+    function switchTrendType(type, btn) {
+      currentTrendType = type;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadTrendChart();
+    }
+
+    async function loadComplianceChart() {
+      const res = await API.get('industries', { limit: 100 });
+      const stats = res.ok ? res.data.stats : { compliant: 5, non_compliant: 2, under_review: 1 };
+      if (complianceChart) complianceChart.destroy();
+      complianceChart = new Chart(document.getElementById('compliance-chart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Compliant', 'Non-Compliant', 'Under Review'],
+          datasets: [{ data: [stats.compliant || 5, stats.non_compliant || 2, stats.under_review || 1], backgroundColor: ['#2E7D32','#C62828','#F57C00'], borderWidth: 0 }]
+        },
+        options: { responsive:true, maintainAspectRatio:false, plugins: { legend: { position:'bottom', labels: { color: defaultChartOptions().plugins.legend.labels.color, padding:12, usePointStyle:true, font:{size:11} } } }, cutout:'65%' }
+      });
+    }
+
+    async function loadStations() {
+      const res = await API.get('stations', { limit: 6 });
+      const stations = res.ok ? res.data.data : [];
+      const demoStations = [
+        { name:'Delhi Air Station 1', type:'air', region:'Delhi', status:'active' },
+        { name:'Mumbai Sea Monitor', type:'water', region:'Mumbai', status:'active' },
+        { name:'Pune Noise Station', type:'noise', region:'Pune', status:'active' },
+        { name:'Chennai Air Monitor', type:'air', region:'Chennai', status:'warning' },
+        { name:'Kolkata River Monitor', type:'water', region:'Kolkata', status:'warning' },
+        { name:'Ahmedabad Noise', type:'noise', region:'Ahmedabad', status:'maintenance' }
+      ];
+      const list = stations.length ? stations.slice(0,6) : demoStations;
+      const icons = { air:'💨', water:'💧', noise:'🔊' };
+      const dotColors = { active:'#2E7D32', warning:'#F57C00', maintenance:'#1565C0', inactive:'#546E7A', critical:'#C62828' };
+      document.getElementById('stations-list').innerHTML = list.map(s => `
+        <div class="station-row">
+          <div class="station-dot" style="background:${dotColors[s.status]||'#546E7A'}"></div>
+          <span style="font-size:1.2rem">${icons[s.type]||'📡'}</span>
+          <div style="flex:1">
+            <div style="font-size:0.87rem;font-weight:600">${s.name}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">${s.region}</div>
+          </div>
+          ${Format.badge(s.status)}
+        </div>`).join('');
+    }
+
+    async function loadAlerts() {
+      const res = await API.get('alerts', { limit: 4 });
+      const alerts = res.ok ? res.data.data : [];
+      const icons = { air:'💨', water:'💧', noise:'🔊', compliance:'🏭', system:'⚙️' };
+      const bgColors = { critical:'rgba(211,47,47,0.1)', high:'rgba(245,124,0,0.1)', medium:'rgba(0,137,123,0.08)', low:'rgba(46,125,50,0.08)' };
+      document.getElementById('alerts-list').innerHTML = alerts.length ? alerts.slice(0,4).map(a => `
+        <div class="recent-alert">
+          <div class="stat-icon" style="width:38px;height:38px;font-size:1rem;background:${bgColors[a.severity]};">${icons[a.type]||'⚠️'}</div>
+          <div style="flex:1">
+            <div style="font-size:0.84rem;font-weight:600;margin-bottom:2px">${a.title}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted)">${Format.datetime(a.created_at)}</div>
+          </div>
+          ${Format.severityBadge(a.severity)}
+        </div>`).join('') : '<p class="text-muted text-center" style="font-size:0.85rem;padding:20px 0">No recent alerts</p>';
+    }
+
+    async function loadHourly() {
+      const hours = Array.from({length:13},(_, i)=>{ const h=8+i; return h<10?`0${h}:00`:`${h}:00`; });
+      const airData = hours.map(()=> 120 + Math.random()*100);
+      const waterData = hours.map(()=> 20 + Math.random()*30);
+      if (hourlyChart) hourlyChart.destroy();
+      const opts = defaultChartOptions();
+      hourlyChart = new Chart(document.getElementById('hourly-chart'), {
+        type: 'bar',
+        data: {
+          labels: hours,
+          datasets: [
+            { label: 'AQI', data: airData, backgroundColor: '#00897B80', borderColor: '#00897B', borderWidth: 1.5, borderRadius: 6 },
+            { label: 'BOD (×2)', data: waterData.map(v=>v*2), backgroundColor: '#1565C080', borderColor: '#1565C0', borderWidth: 1.5, borderRadius: 6 }
+          ]
+        },
+        options: opts
+      });
+      document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    }
+
+    loadDashboard();
+    // Auto-refresh every 30 seconds
+    setInterval(loadDashboard, 30000);
+  </script>
+</body>
+</html>

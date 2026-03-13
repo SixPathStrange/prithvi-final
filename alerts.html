@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Alerts – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+        <div class="page-header fade-in">
+          <div><h1>🔔 Alerts & Notifications</h1><p>Monitor and manage all environmental alerts</p></div>
+          <div class="flex flex-gap-1">
+            <button class="btn btn-secondary btn-sm" onclick="markAllRead()">✓ Mark All Read</button>
+            <button class="btn btn-secondary btn-sm" onclick="loadAlerts()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="grid grid-4 mb-3 fade-in">
+          <div class="card stat-card"><div class="stat-icon danger">🚨</div><div class="stat-body"><div class="stat-label">Critical</div><div class="stat-value" id="cnt-critical">—</div></div></div>
+          <div class="card stat-card"><div class="stat-icon" style="background:rgba(245,124,0,0.1);color:var(--warning)">⚠️</div><div class="stat-body"><div class="stat-label">High</div><div class="stat-value" id="cnt-high">—</div></div></div>
+          <div class="card stat-card"><div class="stat-icon" style="background:rgba(0,137,123,0.1);color:var(--primary)">📋</div><div class="stat-body"><div class="stat-label">Unread</div><div class="stat-value" id="cnt-unread">—</div></div></div>
+          <div class="card stat-card compliance"><div class="stat-icon compliance">📭</div><div class="stat-body"><div class="stat-label">Total Today</div><div class="stat-value" id="cnt-total">—</div></div></div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar fade-in">
+          <select class="form-control" id="sev-fil" onchange="filterAlerts()" style="width:auto">
+            <option value="">All Severity</option>
+            <option value="critical">🚨 Critical</option>
+            <option value="high">⚠️ High</option>
+            <option value="medium">📋 Medium</option>
+            <option value="low">ℹ️ Low</option>
+          </select>
+          <select class="form-control" id="type-fil" onchange="filterAlerts()" style="width:auto">
+            <option value="">All Types</option>
+            <option value="air">💨 Air</option>
+            <option value="water">💧 Water</option>
+            <option value="noise">🔊 Noise</option>
+            <option value="compliance">🏭 Compliance</option>
+            <option value="system">⚙️ System</option>
+          </select>
+          <select class="form-control" id="read-fil" onchange="filterAlerts()" style="width:auto">
+            <option value="">All</option>
+            <option value="0">Unread Only</option>
+            <option value="1">Read Only</option>
+          </select>
+        </div>
+
+        <!-- Alerts List -->
+        <div class="card fade-in">
+          <div id="alerts-container" style="padding: 16px">
+            <div class="flex-center" style="height:200px"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Escalation Workflow -->
+        <div class="card p-3 mt-3 fade-in">
+          <div class="chart-title mb-3">⚡ Escalation Workflow</div>
+          <div style="display:flex;gap:0;align-items:center;flex-wrap:wrap">
+            <div style="flex:1;min-width:150px;text-align:center;padding:16px">
+              <div style="width:48px;height:48px;background:rgba(0,137,123,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto 10px">🔍</div>
+              <div style="font-size:0.85rem;font-weight:600">Detection</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Auto-detect threshold breach</div>
+            </div>
+            <div style="font-size:1.4rem;color:var(--text-muted)">→</div>
+            <div style="flex:1;min-width:150px;text-align:center;padding:16px">
+              <div style="width:48px;height:48px;background:rgba(245,124,0,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto 10px">🔔</div>
+              <div style="font-size:0.85rem;font-weight:600">Alert Generated</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Notify monitoring team</div>
+            </div>
+            <div style="font-size:1.4rem;color:var(--text-muted)">→</div>
+            <div style="flex:1;min-width:150px;text-align:center;padding:16px">
+              <div style="width:48px;height:48px;background:rgba(21,101,192,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto 10px">👤</div>
+              <div style="font-size:0.85rem;font-weight:600">Regional Review</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Officer acknowledges & acts</div>
+            </div>
+            <div style="font-size:1.4rem;color:var(--text-muted)">→</div>
+            <div style="flex:1;min-width:150px;text-align:center;padding:16px">
+              <div style="width:48px;height:48px;background:rgba(211,47,47,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto 10px">🚨</div>
+              <div style="font-size:0.85rem;font-weight:600">Escalation</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Escalate to Super Admin</div>
+            </div>
+            <div style="font-size:1.4rem;color:var(--text-muted)">→</div>
+            <div style="flex:1;min-width:150px;text-align:center;padding:16px">
+              <div style="width:48px;height:48px;background:rgba(46,125,50,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin:0 auto 10px">✅</div>
+              <div style="font-size:0.85rem;font-weight:600">Resolution</div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">Issue resolved, alert closed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+initApp('Alerts');
+let allAlerts = [];
+
+const typeIcons = { air:'💨', water:'💧', noise:'🔊', compliance:'🏭', system:'⚙️' };
+const sevBg = { critical:'rgba(211,47,47,0.1)', high:'rgba(245,124,0,0.1)', medium:'rgba(0,137,123,0.08)', low:'rgba(46,125,50,0.08)' };
+
+async function loadAlerts() {
+  const res = await API.get('alerts', { limit: 100 });
+  allAlerts = res.ok ? res.data.data : getDemoAlerts();
+  const counts = res.ok ? res.data.counts : { critical: 3, unread: 5, total: 8 };
+  
+  document.getElementById('cnt-critical').textContent = counts?.critical || allAlerts.filter(a=>a.severity==='critical').length;
+  document.getElementById('cnt-high').textContent = allAlerts.filter(a=>a.severity==='high').length;
+  document.getElementById('cnt-unread').textContent = counts?.unread || allAlerts.filter(a=>!a.is_read).length;
+  document.getElementById('cnt-total').textContent = counts?.total || allAlerts.length;
+  
+  renderAlerts(allAlerts);
+}
+
+function getDemoAlerts() {
+  return [
+    {id:1,type:'air',title:'Critical AQI at Delhi Station 1',message:'PM2.5 levels reached 145.6 µg/m³ — AQI 198. Immediate action required.',severity:'critical',station_name:'Delhi Air Station 1',is_read:0,is_acknowledged:0,created_at:new Date().toISOString()},
+    {id:2,type:'water',title:'High BOD Detected – Mumbai',message:'Mumbai Sea Water Monitor shows BOD at 45.2 mg/L, exceeding safe limit of 30 mg/L.',severity:'high',station_name:'Mumbai Sea Water Monitor',is_read:0,is_acknowledged:0,created_at:new Date(Date.now()-3600000).toISOString()},
+    {id:3,type:'noise',title:'Noise Level Exceeded – Pune',message:'Pune Industrial Noise station recorded Lmax 95.2 dB exceeding limit of 85 dB.',severity:'high',station_name:'Pune Industrial Noise',is_read:1,is_acknowledged:1,created_at:new Date(Date.now()-7200000).toISOString()},
+    {id:4,type:'compliance',title:'Non-Compliance: Reliance Petrochem',message:'Reliance Petrochem has exceeded emission limits for 3 consecutive months. Enforcement action initiated.',severity:'critical',industry_name:'Reliance Petrochem',is_read:0,is_acknowledged:0,created_at:new Date(Date.now()-86400000).toISOString()},
+    {id:5,type:'compliance',title:'Non-Compliance: ACC Chemicals Ltd',message:'ACC Chemicals Ltd failed to submit monthly compliance report.',severity:'medium',industry_name:'ACC Chemicals Ltd',is_read:0,is_acknowledged:0,created_at:new Date(Date.now()-172800000).toISOString()},
+    {id:6,type:'air',title:'AQI Warning at Jaipur',message:'PM2.5 at 95.4 µg/m³ — AQI 135. Sensitive groups should limit outdoor activity.',severity:'medium',station_name:'Jaipur Air Monitor',is_read:1,is_acknowledged:0,created_at:new Date(Date.now()-259200000).toISOString()},
+    {id:7,type:'system',title:'Maintenance Scheduled',message:'Ahmedabad Noise Station scheduled for maintenance on 10 March 2026.',severity:'low',is_read:1,is_acknowledged:1,created_at:new Date(Date.now()-345600000).toISOString()},
+    {id:8,type:'air',title:'NO2 Spike at Delhi',message:'NO2 levels at 89.4 µg/m³ at Delhi Air Station 1, approaching critical threshold.',severity:'high',is_read:0,is_acknowledged:0,created_at:new Date(Date.now()-432000000).toISOString()},
+  ];
+}
+
+function filterAlerts() {
+  const sev = document.getElementById('sev-fil').value;
+  const type = document.getElementById('type-fil').value;
+  const read = document.getElementById('read-fil').value;
+  const filtered = allAlerts.filter(a => {
+    return (!sev || a.severity===sev) && (!type || a.type===type) && (read==='' || String(a.is_read)===read);
+  });
+  renderAlerts(filtered);
+}
+
+function renderAlerts(alerts) {
+  const container = document.getElementById('alerts-container');
+  if (!alerts.length) {
+    container.innerHTML = '<div class="text-center text-muted" style="padding:60px 0"><div style="font-size:3rem;margin-bottom:16px">🎉</div><div style="font-size:1rem">No alerts found</div></div>';
+    return;
+  }
+  container.innerHTML = alerts.map(a=>`
+    <div class="alert-item ${a.is_read?'':'unread'} ${a.severity}" id="alert-${a.id}" onclick="markRead(${a.id})">
+      <div class="alert-icon" style="background:${sevBg[a.severity]}">${typeIcons[a.type]||'⚠️'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+          <strong style="font-size:0.9rem;${a.is_read?'':'font-weight:700'}">${a.title}</strong>
+          ${a.is_read?'':'<span style="width:8px;height:8px;background:var(--primary);border-radius:50%;flex-shrink:0"></span>'}
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px;line-height:1.5">${a.message}</p>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${Format.severityBadge(a.severity)}
+          <span style="font-size:0.72rem;color:var(--text-muted)">${typeIcons[a.type]} ${a.type}</span>
+          ${a.station_name?`<span style="font-size:0.72rem;color:var(--text-muted)">📡 ${a.station_name}</span>`:''}
+          ${a.industry_name?`<span style="font-size:0.72rem;color:var(--text-muted)">🏭 ${a.industry_name}</span>`:''}
+          <span style="font-size:0.72rem;color:var(--text-muted);margin-left:auto">${Format.datetime(a.created_at)}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
+        ${a.is_acknowledged?'<span class="badge badge-normal" style="font-size:0.65rem">ACK</span>':'<button class="btn btn-sm btn-outline" style="font-size:0.72rem;padding:4px 10px" onclick="acknowledge(event,'+a.id+')">Acknowledge</button>'}
+      </div>
+    </div>`).join('');
+}
+
+async function markRead(id) {
+  await API.post('alerts', { action: 'read', id });
+  const el = document.getElementById(`alert-${id}`);
+  if (el) el.classList.remove('unread');
+  const a = allAlerts.find(x=>x.id===id);
+  if (a) a.is_read = 1;
+}
+
+async function acknowledge(e, id) {
+  e.stopPropagation();
+  const res = await API.post('alerts', { action: 'acknowledge', id });
+  if (res.ok) { Toast.success('Alert acknowledged'); loadAlerts(); }
+}
+
+async function markAllRead() {
+  const res = await API.post('alerts', { action: 'read_all' });
+  if (res.ok) { Toast.success('All alerts marked as read'); loadAlerts(); }
+}
+
+loadAlerts();
+// Poll every 30 seconds
+setInterval(loadAlerts, 30000);
+</script>
+</body>
+</html>

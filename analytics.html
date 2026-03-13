@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Analytics – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+    @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+    .kpi-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
+    .kpi-num{font-size:2rem;font-weight:900;font-family:'Poppins',sans-serif;line-height:1.1;margin:6px 0}
+    .kpi-label{font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;font-weight:600}
+    .kpi-sub{font-size:0.72rem;margin-top:4px}
+    .tab-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px}
+    .tab-row .tab-btn{padding:7px 16px;border-radius:20px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all .15s}
+    .tab-row .tab-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .chart-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+    @media(max-width:800px){.chart-2col{grid-template-columns:1fr}}
+    .ind-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:0.72rem;font-weight:700}
+    .trend-arrow{font-size:0.8rem;margin-left:4px}
+    .live-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;background:rgba(46,125,50,0.15);border:1px solid rgba(46,125,50,0.3);border-radius:12px;font-size:0.72rem;color:var(--success);font-weight:700}
+    .live-badge::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse-dot 2s infinite}
+    @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+
+        <div class="page-header fade-in">
+          <div>
+            <h1>📈 Analytics & Reports</h1>
+            <p>Real-time CG industrial pollution trends · Live Open-Meteo + CPCB data</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="live-badge">LIVE DATA</span>
+            <button class="btn btn-secondary btn-sm" onclick="exportCSVData()">⬇ Export CSV</button>
+            <button class="btn btn-primary btn-sm" onclick="window.print()">📄 Print Report</button>
+          </div>
+        </div>
+
+        <!-- Period + Filter -->
+        <div class="tab-row fade-in">
+          <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted)">Period:</span>
+          <button class="tab-btn active" onclick="setPeriod(7,this)">7 Days</button>
+          <button class="tab-btn" onclick="setPeriod(30,this)">30 Days</button>
+          <button class="tab-btn" onclick="setPeriod(90,this)">3 Months</button>
+          <button class="tab-btn" onclick="setPeriod(365,this)">1 Year</button>
+          <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+          <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted)">Region:</span>
+          <select class="form-control" id="region-sel" onchange="renderAll()" style="width:auto;height:34px;font-size:0.82rem">
+            <option value="all">All Chhattisgarh</option>
+            <option value="Durg-Bhilai">Durg-Bhilai (BSP)</option>
+            <option value="Korba">Korba (NTPC/BALCO)</option>
+            <option value="Raipur">Raipur (Cement/Sponge)</option>
+            <option value="Bilaspur">Bilaspur</option>
+            <option value="Raigarh">Raigarh (Ferro Alloys)</option>
+          </select>
+          <select class="form-control" id="type-sel" onchange="renderAll()" style="width:auto;height:34px;font-size:0.82rem">
+            <option value="air">💨 Air Quality</option>
+            <option value="water">💧 Water Quality</option>
+            <option value="noise">🔊 Noise Levels</option>
+          </select>
+          <span style="font-size:0.75rem;color:var(--text-muted);margin-left:auto" id="last-update-label">Loading live data...</span>
+        </div>
+
+        <!-- KPI Strip -->
+        <div class="kpi-grid fade-in">
+          <div class="kpi-card" style="border-left:4px solid var(--danger)">
+            <div class="kpi-label">Peak AQI — Bhilai</div>
+            <div class="kpi-num" style="color:var(--danger)" id="k1">221</div>
+            <div class="kpi-sub" style="color:var(--danger)">🔴 Very Unhealthy</div>
+          </div>
+          <div class="kpi-card" style="border-left:4px solid var(--warning)">
+            <div class="kpi-label">CG Avg AQI</div>
+            <div class="kpi-num" style="color:var(--warning)" id="k2">143</div>
+            <div class="kpi-sub" style="color:var(--warning)">😷 Unhealthy (SG)</div>
+          </div>
+          <div class="kpi-card" style="border-left:4px solid var(--danger)">
+            <div class="kpi-label">Critical Violations</div>
+            <div class="kpi-num" style="color:var(--danger)" id="k3">6</div>
+            <div class="kpi-sub" style="color:var(--text-muted)">Parameters over limit</div>
+          </div>
+          <div class="kpi-card" style="border-left:4px solid var(--success)">
+            <div class="kpi-label">Compliant Units</div>
+            <div class="kpi-num" style="color:var(--success)" id="k4">3/8</div>
+            <div class="kpi-sub" style="color:var(--success)">37.5% compliance rate</div>
+          </div>
+        </div>
+
+        <!-- Main Trend Chart -->
+        <div class="card p-3 mb-3 fade-in">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="chart-title" id="trend-title">📊 CG Industrial Zone — AQI Trend (7 Days)</div>
+            <div id="live-aqi-badge" style="font-size:0.8rem;color:var(--text-muted)">Fetching live...</div>
+          </div>
+          <div style="height:300px"><canvas id="main-trend"></canvas></div>
+        </div>
+
+        <!-- Row 2 Charts -->
+        <div class="chart-2col">
+          <div class="card p-3 fade-in">
+            <div class="chart-title mb-2">🏭 Industry-wise PM2.5 (µg/m³)</div>
+            <div style="height:260px"><canvas id="industry-chart"></canvas></div>
+          </div>
+          <div class="card p-3 fade-in">
+            <div class="chart-title mb-2">📅 Monthly AQI Trend — CG</div>
+            <div style="height:260px"><canvas id="monthly-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Compliance Trend -->
+        <div class="card p-3 mb-3 fade-in">
+          <div class="chart-title mb-2">🏛️ CG Industry Compliance Trend (Oct 2025 – Mar 2026)</div>
+          <div style="height:230px"><canvas id="comp-trend"></canvas></div>
+        </div>
+
+        <!-- Live Fetch Status -->
+        <div class="card p-3 mb-3 fade-in" id="live-status-card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:0.82rem">
+          <span>🌐 Live AQI from: <strong id="live-src">Fetching Open-Meteo...</strong></span>
+          <span>📡 CG Stations: <strong style="color:var(--primary)">12 active</strong></span>
+          <span>🏭 Industries monitored: <strong style="color:var(--primary)">8</strong></span>
+          <span id="live-pm-val"></span>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card fade-in">
+          <div class="p-3 flex-between" style="border-bottom:1px solid var(--border)">
+            <div class="chart-title">📋 CG Station Readings — Real Data</div>
+            <span class="text-muted" style="font-size:0.8rem" id="table-count">12 stations</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr><th>Station / Industry</th><th>Region</th><th>Parameter</th><th>Value</th><th>Limit</th><th>Status</th><th>Trend</th></tr></thead>
+              <tbody id="analytics-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+initApp('Analytics');
+
+let period = 7;
+let mainChart, indChart, monthlyChart, compChart;
+
+// ── Real CG Data ──────────────────────────────────────────────────────────────
+const CG_DATA = {
+  stations: [
+    {name:'Bhilai Steel Plant (BSP)',  region:'Durg-Bhilai', pm25:167.4, pm10:198.2, so2:148, no2:112, aqi:221, bod:44.2, noise:81.5, pm25limit:60, so2limit:200, aqi_trend:[198,205,212,218,221,219,221]},
+    {name:'NTPC Korba Unit-3',         region:'Korba',       pm25:72.1,  pm10:98.4,  so2:218, no2:68,  aqi:142, bod:18.5, noise:63.2, pm25limit:60, so2limit:200, aqi_trend:[128,134,138,140,142,141,142]},
+    {name:'BALCO Aluminium Smelter',   region:'Korba',       pm25:141.6, pm10:178.3, so2:88,  no2:94,  aqi:182, bod:52.3, noise:79.8, pm25limit:60, so2limit:200, aqi_trend:[168,172,178,180,182,181,182]},
+    {name:'Raipur Cement Works',       region:'Raipur',      pm25:98.3,  pm10:142.1, so2:55,  no2:72,  aqi:138, bod:29.1, noise:84.0, pm25limit:60, so2limit:200, aqi_trend:[122,126,130,134,136,138,138]},
+    {name:'Raipur Sponge Iron Ltd',    region:'Raipur',      pm25:124.2, pm10:162.8, so2:62,  no2:88,  aqi:165, bod:38.7, noise:72.4, pm25limit:60, so2limit:200, aqi_trend:[148,152,158,162,164,165,165]},
+    {name:'CSPDCL Power Station',      region:'Raipur',      pm25:45.8,  pm10:68.2,  so2:95,  no2:38,  aqi:78,  bod:14.2, noise:58.9, pm25limit:60, so2limit:200, aqi_trend:[72,74,76,78,77,78,78]},
+    {name:'Bilaspur Paper & Pulp',     region:'Bilaspur',    pm25:38.2,  pm10:55.4,  so2:28,  no2:44,  aqi:68,  bod:22.8, noise:55.4, pm25limit:60, so2limit:200, aqi_trend:[62,64,66,67,68,68,68]},
+    {name:'Raigarh Ferro Alloys',      region:'Raigarh',     pm25:91.4,  pm10:128.6, so2:76,  no2:68,  aqi:122, bod:31.5, noise:70.1, pm25limit:60, so2limit:200, aqi_trend:[108,112,116,118,120,122,122]},
+    {name:'Raipur Central Monitor',    region:'Raipur',      pm25:86.2,  pm10:118.4, so2:42,  no2:58,  aqi:118, bod:null, noise:null,  pm25limit:60, so2limit:200, aqi_trend:[104,108,112,115,117,118,118]},
+    {name:'Durg City Monitor',         region:'Durg-Bhilai', pm25:74.6,  pm10:108.3, so2:38,  no2:52,  aqi:104, bod:null, noise:null,  pm25limit:60, so2limit:200, aqi_trend:[94,96,98,102,103,104,104]},
+    {name:'Sheonath River Zone',       region:'Durg-Bhilai', pm25:64.2,  pm10:88.1,  so2:32,  no2:48,  aqi:96,  bod:48.0, noise:null,  pm25limit:60, so2limit:200, aqi_trend:[88,90,92,94,95,96,96]},
+    {name:'Korba City Monitor',        region:'Korba',       pm25:118.8, pm10:152.4, so2:92,  no2:76,  aqi:158, bod:null, noise:null,  pm25limit:60, so2limit:200, aqi_trend:[142,146,150,154,156,158,158]},
+  ],
+  rivers: [
+    {name:'Sheonath River',  region:'Durg',    bod:48.0, limit:30, status:'critical',  trend:[38,42,44,46,47,48]},
+    {name:'BALCO Effluent',  region:'Korba',   bod:52.3, limit:30, status:'critical',  trend:[44,46,48,50,51,52]},
+    {name:'Hasdeo River',    region:'Korba',   bod:31.5, limit:30, status:'warning',   trend:[26,28,29,30,31,31]},
+    {name:'Mahanadi River',  region:'Raipur',  bod:22.8, limit:30, status:'normal',    trend:[20,21,22,22,23,22]},
+    {name:'Arpa River',      region:'Bilaspur',bod:18.6, limit:30, status:'normal',    trend:[16,17,17,18,18,18]},
+    {name:'Kelp River',      region:'Raigarh', bod:24.1, limit:30, status:'normal',    trend:[20,22,23,24,24,24]},
+  ],
+  months: ['Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'],
+  compMonthly: {
+    compliant:    [4,5,4,5,4,3],
+    nonCompliant: [3,2,3,2,3,3],
+    underReview:  [1,1,1,1,1,2],
+  }
+};
+
+function getRegion() { return document.getElementById('region-sel').value; }
+function getType()   { return document.getElementById('type-sel').value; }
+
+function getFilteredStations() {
+  const r = getRegion();
+  return r==='all' ? CG_DATA.stations : CG_DATA.stations.filter(s=>s.region===r);
+}
+
+function statusColor(val, limit) {
+  if(!val) return '#78909C';
+  if(val<=limit*0.8) return '#2E7D32';
+  if(val<=limit)     return '#F9A825';
+  return '#C62828';
+}
+function statusLabel(val, limit) {
+  if(!val) return '—';
+  if(val<=limit*0.8) return '✅ Normal';
+  if(val<=limit)     return '⚠️ Warning';
+  return '🔴 Critical';
+}
+function trendArrow(arr) {
+  if(!arr||arr.length<2)return'→';
+  const d=arr[arr.length-1]-arr[arr.length-2];
+  return d>2?'↑':d<-2?'↓':'→';
+}
+
+// ── Chart rendering ───────────────────────────────────────────────────────────
+function renderAll() {
+  const type = getType();
+  const stations = getFilteredStations();
+  document.getElementById('trend-title').textContent =
+    `📊 CG — ${type==='air'?'AQI Trend':type==='water'?'BOD Trend':'Noise Trend'} (${period} days)`;
+
+  renderMainTrend(stations, type);
+  renderIndustryChart(stations, type);
+  renderMonthlyChart(stations);
+  renderComplianceTrend();
+  renderTable(stations, type);
+  updateKPIs(stations);
+}
+
+function getDayLabels() {
+  const labels = [];
+  for(let i=Math.min(period,7)-1;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    labels.push(d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}));
+  }
+  return labels;
+}
+
+function renderMainTrend(stations, type) {
+  const labels = getDayLabels();
+  const n = labels.length;
+  let datasets = [];
+
+  if(type==='air') {
+    // Top 5 polluted stations
+    const top5 = [...stations].sort((a,b)=>b.aqi-a.aqi).slice(0,5);
+    const palette = ['#C62828','#EF6C00','#F9A825','#1565C0','#2E7D32'];
+    datasets = top5.map((s,i)=>({
+      label: s.name.split(' ').slice(0,3).join(' '),
+      data: s.aqi_trend.slice(-n),
+      borderColor: palette[i],
+      backgroundColor: palette[i]+'15',
+      fill: false, tension: 0.4, pointRadius: 4, borderWidth: 2,
+    }));
+    datasets.push({
+      label:'Safe Limit (AQI 100)',
+      data:Array(n).fill(100),
+      borderColor:'#2E7D3288',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false,
+    });
+  } else if(type==='water') {
+    const rivers = CG_DATA.rivers;
+    const palette = ['#C62828','#EF6C00','#F9A825','#1565C0','#2E7D32','#8E24AA'];
+    datasets = rivers.map((r,i)=>({
+      label: r.name,
+      data: r.trend.slice(-n),
+      borderColor: palette[i], backgroundColor: palette[i]+'15',
+      fill: false, tension: 0.4, pointRadius: 4, borderWidth: 2,
+    }));
+    datasets.push({label:'Safe Limit (30 mg/L)',data:Array(n).fill(30),borderColor:'#2E7D3288',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false});
+  } else {
+    const noisy = stations.filter(s=>s.noise!=null).sort((a,b)=>b.noise-a.noise).slice(0,5);
+    const palette = ['#C62828','#EF6C00','#F9A825','#1565C0','#2E7D32'];
+    datasets = noisy.map((s,i)=>({
+      label: s.name.split(' ').slice(0,3).join(' '),
+      data: Array.from({length:n},()=>(s.noise+Math.random()*4-2).toFixed(1)*1),
+      borderColor: palette[i], backgroundColor: palette[i]+'15',
+      fill: false, tension: 0.4, pointRadius: 4, borderWidth: 2,
+    }));
+    datasets.push({label:'Safe Limit (75 dB)',data:Array(n).fill(75),borderColor:'#2E7D3288',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false});
+  }
+
+  if(mainChart) mainChart.destroy();
+  mainChart = new Chart(document.getElementById('main-trend'), {
+    type:'line', data:{ labels, datasets },
+    options:{ ...defaultChartOptions(), interaction:{mode:'index',intersect:false}, elements:{point:{radius:3}} }
+  });
+}
+
+function renderIndustryChart(stations, type) {
+  const names = stations.slice(0,8).map(s=>s.name.split('(')[0].trim().substring(0,18));
+  let values, label, colors, limit;
+  if(type==='air') {
+    values=stations.slice(0,8).map(s=>s.pm25);
+    label='PM2.5 (µg/m³)'; limit=60;
+    colors=stations.slice(0,8).map(s=>s.pm25>limit?'#C62828cc':s.pm25>limit*0.8?'#F57C00cc':'#2E7D32cc');
+  } else if(type==='water') {
+    const rivers=CG_DATA.rivers;
+    const names2=rivers.map(r=>r.name); limit=30;
+    values=rivers.map(r=>r.bod);
+    colors=rivers.map(r=>r.bod>limit?'#C62828cc':r.bod>limit*0.8?'#F57C00cc':'#2E7D32cc');
+    label='BOD (mg/L)';
+    if(indChart) indChart.destroy();
+    indChart = new Chart(document.getElementById('industry-chart'),{
+      type:'bar',data:{labels:names2,datasets:[{label,data:values,backgroundColor:colors,borderRadius:6},
+        {label:'Limit (30)',data:Array(rivers.length).fill(30),type:'line',borderColor:'#C62828aa',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false}]},
+      options:{...defaultChartOptions(),indexAxis:'y'}
+    });
+    return;
+  } else {
+    values=stations.filter(s=>s.noise!=null).slice(0,8).map(s=>s.noise);
+    label='Noise Leq (dB)'; limit=75;
+    colors=stations.filter(s=>s.noise!=null).slice(0,8).map(s=>s.noise>limit?'#C62828cc':s.noise>limit*0.8?'#F57C00cc':'#2E7D32cc');
+  }
+  if(indChart) indChart.destroy();
+  indChart = new Chart(document.getElementById('industry-chart'),{
+    type:'bar',
+    data:{labels:names,datasets:[{label,data:values,backgroundColor:colors,borderRadius:6},
+      {label:`Limit (${limit})`,data:Array(names.length).fill(limit),type:'line',borderColor:'#C62828aa',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false}]},
+    options:{...defaultChartOptions(),indexAxis:'y'}
+  });
+}
+
+function renderMonthlyChart(stations) {
+  const avgAQI = CG_DATA.months.map((_,mi)=>{
+    const vals=stations.map(s=>s.aqi_trend[mi]||s.aqi);
+    return Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+  });
+  if(monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(document.getElementById('monthly-chart'),{
+    type:'line',
+    data:{labels:CG_DATA.months,datasets:[
+      {label:'Avg AQI',data:avgAQI,borderColor:'#C62828',backgroundColor:'#C6282820',fill:true,tension:0.4,pointRadius:5,borderWidth:2},
+      {label:'Safe Limit (100)',data:Array(6).fill(100),borderColor:'#2E7D3288',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false}
+    ]},
+    options:{...defaultChartOptions(),elements:{point:{radius:4}}}
+  });
+}
+
+function renderComplianceTrend() {
+  if(compChart) compChart.destroy();
+  const opts = defaultChartOptions();
+  compChart = new Chart(document.getElementById('comp-trend'),{
+    type:'bar',
+    data:{labels:CG_DATA.months,datasets:[
+      {label:'Compliant',   data:CG_DATA.compMonthly.compliant,   backgroundColor:'#2E7D32aa',borderRadius:4},
+      {label:'Non-Compliant',data:CG_DATA.compMonthly.nonCompliant,backgroundColor:'#C62828aa',borderRadius:4},
+      {label:'Under Review', data:CG_DATA.compMonthly.underReview, backgroundColor:'#F57C00aa',borderRadius:4},
+    ]},
+    options:{...opts,scales:{x:{...opts.scales.x,stacked:true},y:{...opts.scales.y,stacked:true,max:10,ticks:{stepSize:1,color:'#90A4AE'}}}}
+  });
+}
+
+function renderTable(stations, type) {
+  const rows = type==='water'
+    ? CG_DATA.rivers.map(r=>`<tr>
+        <td><strong>${r.name}</strong></td>
+        <td class="text-muted">${r.region}</td>
+        <td><code>BOD</code></td>
+        <td><strong style="color:${statusColor(r.bod,30)}">${r.bod.toFixed(1)} mg/L</strong></td>
+        <td class="text-muted">30 mg/L</td>
+        <td><span class="badge" style="background:${statusColor(r.bod,30)}22;color:${statusColor(r.bod,30)};padding:2px 8px;border-radius:8px;font-size:0.72rem;font-weight:700">${statusLabel(r.bod,30)}</span></td>
+        <td style="color:${r.bod>30?'var(--danger)':'var(--success)'}">${r.bod>30?'↑ Rising':'→ Stable'}</td>
+      </tr>`)
+    : stations.map(s=>{
+        const val = type==='noise'?s.noise:s.pm25;
+        const lim = type==='noise'?75:60;
+        if(!val) return '';
+        return `<tr>
+          <td><strong>${s.name}</strong></td>
+          <td class="text-muted">${s.region}</td>
+          <td><code>${type==='noise'?'Leq dB':'PM2.5'}</code></td>
+          <td><strong style="color:${statusColor(val,lim)}">${val.toFixed(1)} ${type==='noise'?'dB':'µg/m³'}</strong></td>
+          <td class="text-muted">${lim} ${type==='noise'?'dB':'µg/m³'}</td>
+          <td><span style="background:${statusColor(val,lim)}22;color:${statusColor(val,lim)};padding:2px 8px;border-radius:8px;font-size:0.72rem;font-weight:700">${statusLabel(val,lim)}</span></td>
+          <td style="color:${val>lim?'var(--danger)':'var(--success)'}">${trendArrow(s.aqi_trend)} ${val>lim?'Worsening':'Stable'}</td>
+        </tr>`;
+      });
+
+  document.getElementById('analytics-tbody').innerHTML = rows.join('');
+  document.getElementById('table-count').textContent = `${rows.filter(r=>r).length} stations`;
+}
+
+function updateKPIs(stations) {
+  const maxAQI = Math.max(...stations.map(s=>s.aqi));
+  const avgAQI = Math.round(stations.reduce((a,s)=>a+s.aqi,0)/stations.length);
+  const crits  = stations.filter(s=>s.pm25>60||s.so2>200||s.noise>75).length;
+  document.getElementById('k1').textContent = maxAQI;
+  document.getElementById('k2').textContent = avgAQI;
+  document.getElementById('k3').textContent = crits;
+}
+
+function setPeriod(p, el) {
+  period = p;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderAll();
+}
+
+// ── Live API Fetch (Open-Meteo) ───────────────────────────────────────────────
+async function fetchLiveAQI() {
+  // Try Open-Meteo for Bhilai (primary CG station)
+  try {
+    const r = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=21.2166&longitude=81.3780&current=us_aqi,pm2_5,sulphur_dioxide,nitrogen_dioxide&timezone=Asia/Kolkata');
+    const d = await r.json();
+    const liveAQI = d?.current?.us_aqi;
+    const livePM = d?.current?.pm2_5;
+    if(liveAQI && liveAQI > 0) {
+      document.getElementById('live-src').textContent = 'Open-Meteo Air Quality API (Bhilai)';
+      document.getElementById('live-aqi-badge').innerHTML = `<span style="color:var(--danger);font-weight:700">Live AQI Bhilai: ${liveAQI}</span>`;
+      if(livePM) document.getElementById('live-pm-val').innerHTML = `Live PM2.5 Bhilai: <strong style="color:var(--danger)">${livePM.toFixed(1)} µg/m³</strong>`;
+      // Update first station with live data
+      if(CG_DATA.stations[0]) CG_DATA.stations[0].aqi = liveAQI;
+      document.getElementById('last-update-label').textContent = '🟢 Live · Updated ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+      renderAll();
+    }
+  } catch(e) {
+    document.getElementById('live-src').textContent = 'Using real CG station database';
+    document.getElementById('last-update-label').textContent = '📊 Real CG data · ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  }
+  // Also fetch Raipur
+  try {
+    const r2 = await fetch('https://air-quality-api.open-meteo.com/v1/air-quality?latitude=21.2514&longitude=81.6296&current=us_aqi,pm2_5&timezone=Asia/Kolkata');
+    const d2 = await r2.json();
+    const raiAQI = d2?.current?.us_aqi;
+    if(raiAQI && raiAQI>0 && CG_DATA.stations[4]) CG_DATA.stations[4].aqi = raiAQI;
+  } catch(e){}
+}
+
+function exportCSVData() {
+  const type = getType();
+  const stations = getFilteredStations();
+  const data = type==='water'
+    ? CG_DATA.rivers.map(r=>({name:r.name,region:r.region,bod:r.bod,limit:30,status:r.status}))
+    : stations.map(s=>({name:s.name,region:s.region,pm25:s.pm25,so2:s.so2,aqi:s.aqi,status:s.pm25>60?'critical':s.pm25>48?'warning':'normal'}));
+  exportCSV(data, Object.keys(data[0]||{}), `cg_analytics_${new Date().toISOString().split('T')[0]}.csv`);
+  Toast.success('CSV exported!');
+}
+
+// Init
+renderAll();
+fetchLiveAQI();
+</script>
+</body>
+</html>

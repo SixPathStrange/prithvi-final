@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Industry Compliance – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+        <div class="page-header fade-in">
+          <div><h1>🏭 Industry Compliance</h1><p>Track and manage industry environmental compliance</p></div>
+          <button class="btn btn-primary" onclick="Modal.open('report-modal')">+ Submit Report</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-4 mb-3 fade-in">
+          <div class="card stat-card compliance"><div class="stat-icon compliance">✅</div><div class="stat-body"><div class="stat-label">Compliant</div><div class="stat-value" id="cnt-compliant">—</div><div class="stat-sublabel">Within limits</div></div></div>
+          <div class="card stat-card"><div class="stat-icon danger">❌</div><div class="stat-body"><div class="stat-label">Non-Compliant</div><div class="stat-value" id="cnt-noncompliant">—</div><div class="stat-sublabel">Action required</div></div></div>
+          <div class="card stat-card"><div class="stat-icon" style="background:rgba(245,124,0,0.12);color:var(--warning)">🔍</div><div class="stat-body"><div class="stat-label">Under Review</div><div class="stat-value" id="cnt-review">—</div><div class="stat-sublabel">Pending verification</div></div></div>
+          <div class="card stat-card"><div class="stat-icon" style="background:rgba(2,119,189,0.12);color:var(--info)">⏳</div><div class="stat-body"><div class="stat-label">Pending</div><div class="stat-value" id="cnt-pending">—</div><div class="stat-sublabel">No data submitted</div></div></div>
+        </div>
+
+        <!-- Compliance Chart -->
+        <div class="grid grid-2 mb-3 fade-in">
+          <div class="card p-3">
+            <div class="chart-title mb-2">📊 Compliance Distribution</div>
+            <div style="height:240px"><canvas id="comp-pie-chart"></canvas></div>
+          </div>
+          <div class="card p-3">
+            <div class="chart-title mb-2">📈 Emission Trends (Top Industries)</div>
+            <div style="height:240px"><canvas id="emission-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar fade-in">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input class="form-control" id="ind-search" placeholder="Search industries..." oninput="filterIndustries()"/>
+          </div>
+          <select class="form-control" id="status-fil" onchange="filterIndustries()">
+            <option value="">All Status</option>
+            <option value="compliant">Compliant</option>
+            <option value="non-compliant">Non-Compliant</option>
+            <option value="under_review">Under Review</option>
+            <option value="pending">Pending</option>
+          </select>
+          <select class="form-control" id="region-fil" onchange="filterIndustries()">
+            <option value="">All Regions</option>
+            <option>Jharkhand</option><option>Gujarat</option><option>Uttar Pradesh</option>
+            <option>Rajasthan</option><option>Maharashtra</option><option>West Bengal</option>
+          </select>
+        </div>
+
+        <!-- Industries Table -->
+        <div class="card fade-in">
+          <div class="p-3" style="padding-bottom:0;display:flex;align-items:center;justify-content:space-between">
+            <div class="chart-title">Registered Industries</div>
+            <button class="btn btn-sm btn-secondary" onclick="exportCSV(allIndustries,['name','type','region','compliance_status','last_report_date'],'industries.csv')">⬇ Export</button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr><th>Industry</th><th>Type</th><th>Region</th><th>Reg. No.</th><th>Compliance</th><th>Last Report</th><th>Actions</th></tr></thead>
+              <tbody id="industries-tbody"><tr><td colspan="7" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Compliance Reports -->
+        <div class="card mt-3 fade-in">
+          <div class="p-3" style="padding-bottom:0"><div class="chart-title">📋 Recent Compliance Reports</div></div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr><th>Industry</th><th>Report Date</th><th>AQI</th><th>BOD</th><th>Noise dB</th><th>PM2.5</th><th>Status</th></tr></thead>
+              <tbody id="reports-tbody"><tr><td colspan="7" class="text-center" style="padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Report Modal -->
+<div class="modal-overlay" id="report-modal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <h3>Submit Compliance Report</h3>
+      <button class="btn btn-icon btn-secondary" onclick="Modal.close('report-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="report-form">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label class="form-label">Industry *</label>
+            <select class="form-control" id="rp-industry"><option value="">Select industry...</option></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Report Date *</label>
+            <input class="form-control" type="date" id="rp-date"/>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label" style="font-weight:700;color:var(--primary)">🌫️ Air Quality Parameters</label></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div class="form-group"><label class="form-label">AQI</label><input class="form-control" type="number" id="rp-aqi" placeholder="85"/></div>
+          <div class="form-group"><label class="form-label">PM2.5 (µg/m³)</label><input class="form-control" type="number" id="rp-pm25" placeholder="45"/></div>
+          <div class="form-group"><label class="form-label">PM10 (µg/m³)</label><input class="form-control" type="number" id="rp-pm10" placeholder="80"/></div>
+          <div class="form-group"><label class="form-label">NOx (µg/m³)</label><input class="form-control" type="number" id="rp-nox" placeholder="38"/></div>
+        </div>
+        <div class="form-group"><label class="form-label" style="font-weight:700;color:var(--info)">💧 Water Quality Parameters</label></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="form-group"><label class="form-label">BOD (mg/L)</label><input class="form-control" type="number" id="rp-bod" placeholder="18"/></div>
+          <div class="form-group"><label class="form-label">DO (mg/L)</label><input class="form-control" type="number" id="rp-do" placeholder="6.5"/></div>
+          <div class="form-group"><label class="form-label">Noise (dB)</label><input class="form-control" type="number" id="rp-noise" placeholder="65"/></div>
+        </div>
+        <div class="form-group"><label class="form-label">Remarks</label><textarea class="form-control" id="rp-remarks" placeholder="Additional notes..."></textarea></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('report-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitReport()">Submit Report</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+initApp('Compliance');
+let allIndustries = [];
+let pieChart, emChart;
+
+async function loadIndustries() {
+  const res = await API.get('industries', { limit: 100 });
+  allIndustries = res.ok ? res.data.data : getDemoIndustries();
+  const stats = res.ok ? res.data.stats : { compliant:5, non_compliant:2, under_review:1, pending:0 };
+  
+  document.getElementById('cnt-compliant').textContent = stats.compliant || 0;
+  document.getElementById('cnt-noncompliant').textContent = stats.non_compliant || 0;
+  document.getElementById('cnt-review').textContent = stats.under_review || 0;
+  document.getElementById('cnt-pending').textContent = stats.pending || 0;
+
+  renderIndustriesTable(allIndustries);
+  renderPieChart(stats);
+  renderEmissionChart();
+  
+  // Populate modal
+  const sel = document.getElementById('rp-industry');
+  sel.innerHTML = '<option value="">Select industry...</option>' + allIndustries.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
+  document.getElementById('rp-date').value = new Date().toISOString().split('T')[0];
+}
+
+function getDemoIndustries() {
+  return [
+    {id:1,name:'Tata Steel Plant',type:'Steel Manufacturing',region:'Jharkhand',registration_number:'IND001',compliance_status:'compliant',last_report_date:'2026-02-28'},
+    {id:2,name:'Reliance Petrochem',type:'Petrochemical',region:'Gujarat',registration_number:'IND002',compliance_status:'non-compliant',last_report_date:'2026-02-28'},
+    {id:3,name:'NTPC Power Plant',type:'Power Generation',region:'Uttar Pradesh',registration_number:'IND003',compliance_status:'compliant',last_report_date:'2026-02-28'},
+    {id:4,name:'Birla Cement Works',type:'Cement',region:'Rajasthan',registration_number:'IND004',compliance_status:'under_review',last_report_date:'2026-02-28'},
+    {id:5,name:'ACC Chemicals Ltd',type:'Chemical Industry',region:'Maharashtra',registration_number:'IND005',compliance_status:'non-compliant',last_report_date:'2026-02-28'},
+    {id:6,name:'SAIL Iron Factory',type:'Iron & Steel',region:'West Bengal',registration_number:'IND006',compliance_status:'compliant',last_report_date:'2026-02-28'},
+  ];
+}
+
+function renderIndustriesTable(list) {
+  const tbody = document.getElementById('industries-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:30px">No industries found</td></tr>'; return; }
+  tbody.innerHTML = list.map(ind=>`<tr>
+    <td><strong>${ind.name}</strong></td>
+    <td class="text-muted">${ind.type}</td>
+    <td>${ind.region}</td>
+    <td><code style="font-size:0.75rem">${ind.registration_number||'—'}</code></td>
+    <td>${Format.badge(ind.compliance_status)}</td>
+    <td class="text-muted" style="font-size:0.8rem">${Format.date(ind.last_report_date)}</td>
+    <td><button class="btn btn-sm btn-secondary" onclick="viewReports(${ind.id},'${ind.name}')">View</button></td>
+  </tr>`).join('');
+}
+
+function filterIndustries() {
+  const search = document.getElementById('ind-search').value.toLowerCase();
+  const status = document.getElementById('status-fil').value;
+  const region = document.getElementById('region-fil').value;
+  const filtered = allIndustries.filter(i=>{
+    const ms = !search || [i.name,i.type,i.region].some(f=>(f||'').toLowerCase().includes(search));
+    const ss = !status || i.compliance_status === status;
+    const rs = !region || i.region === region;
+    return ms && ss && rs;
+  });
+  renderIndustriesTable(filtered);
+}
+
+function renderPieChart(stats) {
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(document.getElementById('comp-pie-chart'), {
+    type:'doughnut',
+    data:{ labels:['Compliant','Non-Compliant','Under Review','Pending'], datasets:[{ data:[stats.compliant,stats.non_compliant,stats.under_review,stats.pending||0], backgroundColor:['#2E7D32','#C62828','#F57C00','#1565C0'], borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{ legend:{ position:'bottom', labels:{ color:defaultChartOptions().plugins.legend.labels.color, padding:12, font:{size:11}, usePointStyle:true } } } }
+  });
+}
+
+function renderEmissionChart() {
+  if (emChart) emChart.destroy();
+  const opts = defaultChartOptions();
+  emChart = new Chart(document.getElementById('emission-chart'), {
+    type:'bar',
+    data:{
+      labels:['Tata Steel','Reliance','NTPC','Birla','ACC','SAIL'],
+      datasets:[
+        { label:'AQI',data:[85,210,68,122,178,72],backgroundColor:'#00897B80',borderColor:'#00897B',borderWidth:1.5,borderRadius:4 },
+        { label:'BOD (mg/L)',data:[18,52,15,29,49,17],backgroundColor:'#1565C080',borderColor:'#1565C0',borderWidth:1.5,borderRadius:4 }
+      ]
+    },
+    options:{ ...opts, plugins:{ ...opts.plugins } }
+  });
+}
+
+async function viewReports(industryId, name) {
+  Toast.info(`Loading reports for ${name}...`);
+  const res = await API.get('reports', { industry_id: industryId });
+  const reports = res.ok ? res.data.data : getDemoReports();
+  renderReportsTable(reports);
+}
+
+function getDemoReports() {
+  return [
+    {industry_name:'Tata Steel Plant',report_date:'2026-02-28',aqi_value:85.2,water_bod:18.5,noise_db:65.3,pm25_level:48.3,status:'compliant'},
+    {industry_name:'Reliance Petrochem',report_date:'2026-02-28',aqi_value:210.5,water_bod:52.3,noise_db:92.1,pm25_level:185.4,status:'non-compliant'},
+    {industry_name:'NTPC Power Plant',report_date:'2026-02-28',aqi_value:68.4,water_bod:15.2,noise_db:58.6,pm25_level:35.2,status:'compliant'},
+    {industry_name:'Birla Cement',report_date:'2026-02-28',aqi_value:122.3,water_bod:28.9,noise_db:74.2,pm25_level:98.6,status:'under_review'},
+  ];
+}
+
+function renderReportsTable(reports) {
+  const tbody = document.getElementById('reports-tbody');
+  tbody.innerHTML = reports.map(r=>`<tr>
+    <td><strong>${r.industry_name}</strong></td>
+    <td class="text-muted" style="font-size:0.8rem">${Format.date(r.report_date)}</td>
+    <td><span style="font-weight:600;color:${r.aqi_value>150?'var(--danger)':r.aqi_value>100?'var(--warning)':'var(--success)'}">${r.aqi_value||'—'}</span></td>
+    <td><span style="color:${r.water_bod>30?'var(--danger)':'var(--success)'}">${r.water_bod||'—'}</span></td>
+    <td><span style="color:${r.noise_db>75?'var(--danger)':'inherit'}">${r.noise_db||'—'}</span></td>
+    <td>${r.pm25_level||'—'}</td>
+    <td>${Format.badge(r.status)}</td>
+  </tr>`).join('');
+}
+
+async function submitReport() {
+  const industryId = document.getElementById('rp-industry').value;
+  const date = document.getElementById('rp-date').value;
+  if (!industryId || !date) { Toast.error('Industry and date are required'); return; }
+
+  const data = {
+    industry_id: industryId, report_date: date,
+    aqi_value: document.getElementById('rp-aqi').value,
+    water_bod: document.getElementById('rp-bod').value,
+    water_do: document.getElementById('rp-do').value,
+    noise_db: document.getElementById('rp-noise').value,
+    pm25_level: document.getElementById('rp-pm25').value,
+    pm10_level: document.getElementById('rp-pm10').value,
+    nox_level: document.getElementById('rp-nox').value,
+    remarks: document.getElementById('rp-remarks').value,
+    submitted_by: Auth.getUser()?.id
+  };
+
+  const res = await API.post('reports', data);
+  if (res.ok) {
+    Modal.close('report-modal');
+    Toast.success(`Report submitted. Status: ${res.data.status}`);
+    loadIndustries();
+    document.getElementById('report-form').reset();
+  } else {
+    Toast.error(res.data?.error || 'Failed to submit report');
+  }
+}
+
+loadIndustries();
+// Load initial reports
+setTimeout(() => renderReportsTable(getDemoReports()), 500);
+</script>
+</body>
+</html>

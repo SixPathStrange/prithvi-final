@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login – PrithviNet</title>
+    <link rel="stylesheet" href="assets/css/custom.css">
+    <style>
+        /* Centered layout specifically for the login page */
+        .login-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--nav-bg); /* Uses your custom CSS dark theme background */
+            padding: 20px;
+        }
+        
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--nav-bg);
+            border: 1px solid var(--nav-border);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-header .logo-icon {
+            font-size: 2rem;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #00897B, #4DB6AC);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px auto;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0,137,123,0.3);
+        }
+
+        .login-header h2 {
+            margin: 0 0 4px 0;
+            font-size: 1.5rem;
+        }
+
+        .demo-box {
+            background: rgba(0, 137, 123, 0.05);
+            border: 1px solid rgba(0, 137, 123, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 24px;
+        }
+
+        .demo-list {
+            list-style: none;
+            padding: 0;
+            margin: 12px 0;
+            font-size: 0.85rem;
+        }
+
+        .demo-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .demo-list li:hover {
+            background: rgba(0, 137, 123, 0.15);
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+    <div class="login-card fade-in">
+        
+        <div class="login-header">
+            <div class="logo-icon">🌿</div>
+            <h2>PrithviNet</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Environmental Monitoring Platform</p>
+        </div>
+
+        <h3 style="font-size: 1.25rem; margin-bottom: 4px;">Welcome back 👋</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Sign in to your account to access the dashboard</p>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" class="form-control" placeholder="you@example.com" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 10px; margin-top: 8px;">Sign In</button>
+        </form>
+
+        <div class="demo-box">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #4DB6AC; letter-spacing: 0.5px;">🔑 DEMO CREDENTIALS (CLICK TO FILL)</div>
+            <ul class="demo-list">
+                <li onclick="autoFill('admin@prithvinet.gov.in')">
+                    <span>👑 Super Admin</span> <span style="color: var(--text-muted);">admin@prithvinet.gov.in</span>
+                </li>
+                <li onclick="autoFill('priya@cecb.cg.gov.in')">
+                    <span>🏛️ Regional Officer</span> <span style="color: var(--text-muted);">priya@cecb.cg.gov.in</span>
+                </li>
+                <li onclick="autoFill('amit@bhilai.gov.in')">
+                    <span>🏭 Industry User</span> <span style="color: var(--text-muted);">amit@bhilai.gov.in</span>
+                </li>
+                <li onclick="autoFill('rahul@monitoring.cg.in')">
+                    <span>🔬 Monitoring Team</span> <span style="color: var(--text-muted);">rahul@monitoring.cg.in</span>
+                </li>
+                <li onclick="autoFill('citizen@gmail.com')">
+                    <span>🌱 Citizen</span> <span style="color: var(--text-muted);">citizen@gmail.com</span>
+                </li>
+            </ul>
+            <div style="font-size: 0.75rem; text-align: center; color: var(--text-muted); margin-top: 12px;">
+                Password for all accounts: <strong style="color: var(--text-primary);">password123</strong>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 24px; font-size: 0.85rem;">
+            <span style="color: var(--text-muted);">Don't have an account?</span> 
+            <a href="signup.html" style="color: #4DB6AC; text-decoration: none; font-weight: 600;">Create one</a>
+        </div>
+
+    </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+    // Initialize Theme & Toast notifications but don't require auth on the login page!
+    initPublicApp(); 
+
+    // Redirect if already logged in
+    if (Auth.isLoggedIn()) {
+        window.location.href = './dashboard.html';
+    }
+
+    // Auto-fill form feature for the demo
+    function autoFill(email) {
+        document.getElementById('email').value = email;
+        document.getElementById('password').value = 'password123';
+        Toast.info('Credentials auto-filled! Click Sign In.');
+    }
+
+    // Handle the login submission
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const btn = e.target.querySelector('button');
+        
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
+
+        try {
+            // This calls your mock API in app.js
+            const res = await API.post('login', { email, password });
+            
+            if (res.ok && res.data.success) {
+                Toast.success('Login successful! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = './dashboard.html';
+                }, 800);
+            } else {
+                Toast.error(res.data.error || 'Invalid credentials');
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        } catch (error) {
+            Toast.error('A connection error occurred.');
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    });
+</script>
+
+</body>
+</html>

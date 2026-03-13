@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Forecasting – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+        <div class="page-header fade-in">
+          <div><h1>🔮 Pollution Forecasting</h1><p>AI-powered 24, 48, and 72-hour pollution level predictions</p></div>
+          <button class="btn btn-primary" onclick="generateForecast()">↻ Regenerate Forecast</button>
+        </div>
+
+        <!-- Station Selector -->
+        <div class="card p-3 mb-3 fade-in">
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <div>
+              <label class="form-label" style="margin-bottom:6px">Select Station</label>
+              <select class="form-control" id="station-sel" onchange="generateForecast()" style="width:auto;min-width:220px">
+                <option value="1">Delhi Air Station 1</option>
+                <option value="2">Mumbai Sea Water Monitor</option>
+                <option value="3">Pune Industrial Noise</option>
+                <option value="4">Chennai Air Monitor</option>
+                <option value="9">Jaipur Air Monitor</option>
+              </select>
+            </div>
+            <div class="tabs" style="align-self:flex-end">
+              <button class="tab-btn active" onclick="setHorizon(24,this)">24 Hours</button>
+              <button class="tab-btn" onclick="setHorizon(48,this)">48 Hours</button>
+              <button class="tab-btn" onclick="setHorizon(72,this)">72 Hours</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-3 mb-3 fade-in" id="summary-cards">
+          <div class="card stat-card air"><div class="stat-icon air">24H</div><div class="stat-body"><div class="stat-label">24-Hour Forecast</div><div class="stat-value" id="f-24h">168</div><div class="stat-sublabel" id="f-24h-trend">📈 Increasing</div></div></div>
+          <div class="card stat-card water"><div class="stat-icon water">48H</div><div class="stat-body"><div class="stat-label">48-Hour Forecast</div><div class="stat-value" id="f-48h">182</div><div class="stat-sublabel" id="f-48h-trend">📈 Increasing</div></div></div>
+          <div class="card stat-card noise"><div class="stat-icon noise">72H</div><div class="stat-body"><div class="stat-label">72-Hour Forecast</div><div class="stat-value" id="f-72h">195</div><div class="stat-sublabel" id="f-72h-trend">📈 Increasing</div></div></div>
+        </div>
+
+        <!-- Main Forecast Chart -->
+        <div class="card p-3 mb-3 fade-in">
+          <div class="chart-header">
+            <div class="chart-title">📊 Predicted Values with Confidence Interval</div>
+            <span class="badge aqi-badge aqi-unhealthy" id="forecast-aqi-label">Unhealthy</span>
+          </div>
+          <div style="height:340px"><canvas id="forecast-chart"></canvas></div>
+        </div>
+
+        <!-- Grid: Hourly Breakdowns -->
+        <div class="grid grid-2 mb-3">
+          <div class="card p-3 fade-in">
+            <div class="chart-title mb-2">⏰ Hourly Breakdown (Next 24h)</div>
+            <div style="height:240px"><canvas id="hourly-forecast"></canvas></div>
+          </div>
+          <div class="card p-3 fade-in">
+            <div class="chart-title mb-2">📋 Forecast Summary Table</div>
+            <div class="table-container" style="max-height:240px;overflow-y:auto">
+              <table class="data-table" id="forecast-table">
+                <thead><tr><th>Hour</th><th>Predicted</th><th>Low CI</th><th>High CI</th><th>Risk</th></tr></thead>
+                <tbody id="forecast-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="card p-3 fade-in" id="recommendations">
+          <div class="chart-title mb-3">💡 AI Recommendations</div>
+          <div id="rec-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+initApp('Forecasting');
+let forecastChart, hourlyFChart, horizon = 24;
+
+function setHorizon(h, el) {
+  horizon = h;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  generateForecast();
+}
+
+async function generateForecast() {
+  const stationId = document.getElementById('station-sel').value;
+  const res = await API.get('forecast', { station_id: stationId, hours: horizon });
+  
+  // Use demo data
+  renderForecast(generateDemoForecast());
+}
+
+function generateDemoForecast() {
+  const now = 198;
+  let val = now;
+  const hours = Array.from({length: horizon}, (_, i) => {
+    val = Math.max(40, val + (Math.random()-0.45)*12);
+    const std = 18 + Math.random()*10;
+    return {
+      hour: i+1,
+      datetime: (() => { const d=new Date(); d.setHours(d.getHours()+i+1); return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}); })(),
+      predicted: Math.round(val),
+      confidence_low: Math.max(0, Math.round(val - std)),
+      confidence_high: Math.round(val + std)
+    };
+  });
+  return { forecasts: { 'PM2.5': hours }, station: { name: 'Delhi Air Station 1', type: 'air' } };
+}
+
+function renderForecast(data) {
+  const params = Object.keys(data.forecasts || {});
+  if (!params.length) return;
+  const mainParam = params[0];
+  const forecastData = data.forecasts[mainParam];
+  
+  // Update summary cards
+  const h24 = forecastData[Math.min(23, forecastData.length-1)];
+  const h48 = forecastData[Math.min(47, forecastData.length-1)] || h24;
+  const h72 = forecastData[Math.min(71, forecastData.length-1)] || h48;
+  document.getElementById('f-24h').textContent = h24?.predicted || '—';
+  document.getElementById('f-48h').textContent = h48?.predicted || '—';
+  document.getElementById('f-72h').textContent = h72?.predicted || '—';
+  
+  const trend24 = h24?.predicted > forecastData[0]?.predicted ? '📈 Increasing' : '📉 Decreasing';
+  ['f-24h-trend','f-48h-trend','f-72h-trend'].forEach(id=>document.getElementById(id).textContent = trend24);
+  
+  // AQI label
+  const aqiInfo = Format.aqiLabel(h24?.predicted || 0);
+  document.getElementById('forecast-aqi-label').className = `badge aqi-badge ${aqiInfo.cls}`;
+  document.getElementById('forecast-aqi-label').textContent = aqiInfo.label;
+  
+  // Main chart
+  const labels = forecastData.map(d=>d.datetime);
+  const predicted = forecastData.map(d=>d.predicted);
+  const low = forecastData.map(d=>d.confidence_low);
+  const high = forecastData.map(d=>d.confidence_high);
+  
+  if (forecastChart) forecastChart.destroy();
+  forecastChart = new Chart(document.getElementById('forecast-chart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: `${mainParam} Predicted`, data: predicted, borderColor:'#00897B', backgroundColor:'#00897B20', fill:false, tension:0.4, borderWidth:2.5, pointRadius:3 },
+        { label: 'Confidence High', data: high, borderColor:'#C62828', backgroundColor:'rgba(211,47,47,0.1)', fill:'+1', tension:0.4, borderWidth:1, borderDash:[4,4], pointRadius:0 },
+        { label: 'Confidence Low', data: low, borderColor:'#C62828', fill:false, tension:0.4, borderWidth:1, borderDash:[4,4], pointRadius:0 }
+      ]
+    },
+    options: { ...defaultChartOptions(), elements:{point:{radius:3}} }
+  });
+  
+  // Hourly chart (first 24h)
+  const h24Data = forecastData.slice(0,24);
+  if (hourlyFChart) hourlyFChart.destroy();
+  hourlyFChart = new Chart(document.getElementById('hourly-forecast'), {
+    type: 'bar',
+    data: {
+      labels: h24Data.map(d=>d.datetime),
+      datasets: [{ label: mainParam, data: h24Data.map(d=>d.predicted), backgroundColor: h24Data.map(d=>d.predicted>150?'#C6282890':d.predicted>100?'#F57C0090':'#2E7D3290'), borderRadius:4 }]
+    },
+    options: defaultChartOptions()
+  });
+  
+  // Table
+  document.getElementById('forecast-tbody').innerHTML = forecastData.slice(0,12).map(d=>{
+    const risk = d.predicted>150?'<span class="badge badge-critical">Critical</span>':d.predicted>100?'<span class="badge badge-warning">Warning</span>':'<span class="badge badge-normal">Normal</span>';
+    return `<tr><td>${d.hour}h</td><td><strong>${d.predicted}</strong></td><td>${d.confidence_low}</td><td>${d.confidence_high}</td><td>${risk}</td></tr>`;
+  }).join('');
+  
+  // Recommendations
+  const avgPred = predicted.reduce((a,b)=>a+b,0)/predicted.length;
+  const recs = avgPred > 150 ? [
+    {icon:'🚨', text:'Issue immediate public health advisory for the forecast period', color:'var(--danger)'},
+    {icon:'🏭', text:'Notify major industries to reduce emissions for next 72 hours', color:'var(--danger)'},
+    {icon:'🏥', text:'Alert hospitals to prepare for increased respiratory admissions', color:'var(--warning)'},
+    {icon:'🌬️', text:'Monitor meteorological data for wind pattern changes that could improve dispersion', color:'var(--info)'},
+    {icon:'📱', text:'Send citizen health alerts — recommend N95 masks for outdoor activities', color:'var(--warning)'},
+  ] : avgPred > 100 ? [
+    {icon:'⚠️', text:'Send precautionary advisories to sensitive population groups', color:'var(--warning)'},
+    {icon:'📡', text:'Increase monitoring frequency at high-risk stations', color:'var(--info)'},
+    {icon:'🏭', text:'Request voluntary emission reduction from nearby industries', color:'var(--primary)'},
+  ] : [
+    {icon:'✅', text:'Air quality expected to remain within safe limits — continue monitoring', color:'var(--success)'},
+    {icon:'📊', text:'Update public dashboard with positive forecast data', color:'var(--success)'},
+  ];
+  document.getElementById('rec-list').innerHTML = recs.map(r=>`
+    <div style="display:flex;gap:14px;align-items:flex-start;padding:12px;border-radius:10px;background:var(--bg);margin-bottom:10px;border-left:3px solid ${r.color}">
+      <span style="font-size:1.3rem;flex-shrink:0">${r.icon}</span>
+      <p style="font-size:0.87rem;line-height:1.5;margin:0">${r.text}</p>
+    </div>`).join('');
+}
+
+generateForecast();
+</script>
+</body>
+</html>

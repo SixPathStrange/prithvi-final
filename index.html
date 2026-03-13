@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PrithviNet – Smart Environmental Monitoring Platform</title>
+  <meta name="description" content="PrithviNet is India's advanced environmental monitoring and compliance platform tracking Air, Water, and Noise pollution in real-time."/>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <style>
+    :root { --nav-h: 70px; }
+
+    /* ── Body ── */
+    body { overflow-x: hidden; transition: background 0.35s ease, color 0.35s ease; }
+
+    /* ── Landing Navbar ── */
+    .land-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: var(--nav-h);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 5%;
+      background: var(--nav-bg);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--nav-border);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+    [data-theme="dark"]  { --nav-bg: rgba(13,27,42,0.85);   --nav-border: rgba(255,255,255,0.06); }
+    [data-theme="light"] { --nav-bg: rgba(255,255,255,0.9);  --nav-border: rgba(0,0,0,0.08); }
+    .land-nav.scrolled { box-shadow: 0 4px 24px rgba(0,0,0,0.18); }
+    [data-theme="dark"]  .land-nav.scrolled { background: rgba(13,27,42,0.98); }
+    [data-theme="light"] .land-nav.scrolled { background: rgba(255,255,255,0.98); }
+
+    .land-logo {
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; text-decoration: none;
+    }
+    .land-logo .logo-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: linear-gradient(135deg,#00897B,#4DB6AC);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; color: #fff;
+      box-shadow: 0 4px 12px rgba(0,137,123,0.35);
+      transition: transform 0.2s;
+    }
+    .land-logo:hover .logo-icon { transform: scale(1.08); }
+    .land-logo h1 {
+      font-size: 1.3rem; font-weight: 700; margin: 0; line-height: 1;
+      color: var(--text-primary);
+    }
+    .land-logo span { font-size: 0.65rem; color: var(--primary); display: block; letter-spacing: 0.08em; }
+
+    .land-nav-links { display: flex; gap: 32px; align-items: center; }
+    .land-nav-links a { font-size: 0.88rem; font-weight: 500; color: var(--text-secondary); transition: color 0.3s; }
+    .land-nav-links a:hover { color: var(--primary); }
+    .land-nav-actions { display: flex; gap: 10px; align-items: center; }
+    @media (max-width: 768px) { .land-nav-links { display: none; } }
+
+    /* Navbar Theme Toggle */
+    .nav-theme-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--bg); border: 1px solid var(--border);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; transition: var(--transition);
+      color: var(--text-secondary);
+    }
+    .nav-theme-btn:hover { background: var(--border); color: var(--primary); }
+
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 120px 5% 80px;
+      position: relative; overflow: hidden;
+    }
+    .hero-bg {
+      position: absolute; inset: 0;
+      transition: background 0.35s ease;
+    }
+    [data-theme="dark"]  .hero-bg {
+      background: radial-gradient(ellipse at 50% 0%,  rgba(0,137,123,0.30) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 80%, rgba(21,101,192,0.20) 0%, transparent 50%),
+                  linear-gradient(180deg, #0D1B2A 0%, #071526 100%);
+    }
+    [data-theme="light"] .hero-bg {
+      background: radial-gradient(ellipse at 50% 0%,  rgba(0,137,123,0.12) 0%, transparent 65%),
+                  radial-gradient(ellipse at 80% 80%, rgba(21,101,192,0.08) 0%, transparent 55%),
+                  linear-gradient(180deg, #EAF4F2 0%, #F0F4F8 100%);
+    }
+    .hero-particles { position: absolute; inset: 0; overflow: hidden; }
+    .particle {
+      position: absolute; border-radius: 50%; opacity: 0.13;
+      animation: float linear infinite;
+    }
+    [data-theme="light"] .particle { opacity: 0.08; }
+    @keyframes float {
+      0%   { transform: translateY(100vh) rotate(0deg);   opacity: 0; }
+      10%  { opacity: 0.13; }
+      90%  { opacity: 0.13; }
+      100% { transform: translateY(-100px) rotate(720deg); opacity: 0; }
+    }
+    .hero-content { position: relative; z-index: 2; max-width: 900px; }
+
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,137,123,0.12); border: 1px solid rgba(0,137,123,0.28);
+      color: var(--primary); padding: 6px 16px; border-radius: 20px;
+      font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+    [data-theme="light"] .hero-eyebrow { background: rgba(0,137,123,0.08); }
+    .hero-eyebrow-dot { width: 8px; height: 8px; background: #00897B; border-radius: 50%; animation: pulse-green 2s infinite; }
+    @keyframes pulse-green { 0%,100%{box-shadow:0 0 0 0 rgba(0,137,123,0.6)} 70%{box-shadow:0 0 0 8px transparent} }
+
+    .hero h1 { font-size: clamp(2.4rem,6vw,4.5rem); font-weight: 800; line-height: 1.1; margin-bottom: 24px; color: var(--text-primary); }
+    .hero h1 .gradient-text {
+      background: linear-gradient(135deg, #00897B, #4DB6AC, #1565C0);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero p {
+      font-size: clamp(1rem,2vw,1.2rem); color: var(--text-secondary);
+      max-width: 650px; margin: 0 auto 40px; line-height: 1.8;
+    }
+    .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 60px; }
+
+    .hero-stats { display: flex; gap: 48px; justify-content: center; flex-wrap: wrap; }
+    .hero-stat { text-align: center; }
+    .hero-stat strong {
+      display: block; font-size: 2rem; font-weight: 800;
+      color: var(--primary); font-family: 'Poppins',sans-serif;
+    }
+    .hero-stat span { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+    /* ── Live AQI Strip ── */
+    .aqi-strip-label { text-align:center; margin-bottom:8px; font-size:0.72rem; color:var(--text-muted); }
+    .aqi-strip {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px 24px;
+      display: flex; gap: 0; overflow-x: auto;
+      margin: 0 5%; scrollbar-width: none;
+      box-shadow: var(--shadow);
+    }
+    .aqi-strip::-webkit-scrollbar { display: none; }
+    .aqi-city { flex-shrink: 0; text-align: center; padding: 4px 20px; border-right: 1px solid var(--border); }
+    .aqi-city:last-child { border-right: none; }
+    .aqi-city-name { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+    .aqi-city-value { font-size: 1.4rem; font-weight: 800; font-family: 'Poppins',sans-serif; }
+    .aqi-city-label { font-size: 0.68rem; margin-top: 2px; }
+
+    /* ── Sections ── */
+    section { padding: 90px 5%; }
+    .section-label { text-align: center; color: var(--primary); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 14px; }
+    .section-title { text-align: center; font-size: clamp(1.8rem,3.5vw,2.8rem); margin-bottom: 16px; color: var(--text-primary); }
+    .section-sub { text-align: center; color: var(--text-secondary); max-width: 600px; margin: 0 auto 56px; font-size: 1rem; line-height: 1.8; }
+
+    /* ── Feature Cards ── */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 24px; }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 18px; padding: 28px;
+      transition: all 0.3s ease; cursor: default;
+      box-shadow: var(--shadow);
+    }
+    .feature-card:hover {
+      border-color: rgba(0,137,123,0.4); transform: translateY(-6px);
+      box-shadow: 0 20px 40px rgba(0,137,123,0.12);
+    }
+    [data-theme="light"] .feature-card:hover { background: rgba(0,137,123,0.03); }
+    [data-theme="dark"]  .feature-card:hover { background: rgba(0,137,123,0.1); }
+    .feature-icon { font-size: 2.2rem; margin-bottom: 16px; }
+    .feature-card h3 { font-size: 1.1rem; margin-bottom: 10px; color: var(--text-primary); }
+    .feature-card p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7; }
+
+    /* ── Benefits ── */
+    .benefits-section {
+      border-radius: 24px; margin: 0 2%;
+    }
+    [data-theme="dark"]  .benefits-section { background: rgba(0,137,123,0.06); }
+    [data-theme="light"] .benefits-section { background: linear-gradient(135deg, rgba(0,137,123,0.05), rgba(21,101,192,0.04)); border: 1px solid rgba(0,137,123,0.12); }
+    .benefits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 24px; }
+    .benefit-item { text-align: center; }
+    .benefit-icon {
+      width: 64px; height: 64px; border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; margin: 0 auto 16px;
+    }
+    .benefit-item h4 { font-size: 1rem; margin-bottom: 6px; color: var(--text-primary); }
+    .benefit-item p { font-size: 0.82rem; color: var(--text-secondary); }
+
+    /* ── Roles ── */
+    .roles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 16px; }
+    .role-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 24px 16px; text-align: center;
+      transition: all 0.3s ease; box-shadow: var(--shadow);
+    }
+    .role-card:hover { border-color: rgba(0,137,123,0.4); transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    [data-theme="light"] .role-card:hover { background: rgba(0,137,123,0.03); }
+    [data-theme="dark"]  .role-card:hover { background: rgba(0,137,123,0.1); }
+    .role-icon { font-size: 2rem; margin-bottom: 10px; }
+    .role-card h4 { font-size: 0.92rem; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
+    .role-card p { font-size: 0.75rem; color: var(--text-secondary); }
+
+    /* ── CTA ── */
+    .cta-section {
+      text-align: center; border-radius: 24px;
+      padding: 80px 40px; margin: 0 5%;
+    }
+    [data-theme="dark"]  .cta-section { background: linear-gradient(135deg, rgba(0,137,123,0.2), rgba(21,101,192,0.2)); border: 1px solid rgba(0,137,123,0.2); }
+    [data-theme="light"] .cta-section {
+      background: linear-gradient(135deg, #E0F7FA, #E8EAF6);
+      border: 1px solid rgba(0,137,123,0.2);
+      box-shadow: 0 8px 40px rgba(0,137,123,0.1);
+    }
+    .cta-section p { color: var(--text-secondary); max-width:500px; margin:0 auto 36px; font-size:1rem; line-height:1.8; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 5%;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px;
+    }
+    [data-theme="dark"]  footer { background: rgba(0,0,0,0.3); }
+    [data-theme="light"] footer { background: var(--bg-card); }
+    footer p { font-size: 0.82rem; color: var(--text-muted); }
+    .footer-links { display: flex; gap: 24px; }
+    footer a { font-size: 0.82rem; color: var(--text-muted); transition: color 0.2s; }
+    footer a:hover { color: var(--primary); }
+
+    /* ── Light Theme: Button Overrides ── */
+    [data-theme="light"] .btn-outline {
+      color: var(--primary); border-color: var(--primary);
+    }
+    [data-theme="light"] .btn-outline:hover { background: var(--primary); color: #fff; }
+
+    /* ── "Powered by" badge strip ── */
+    .tech-strip {
+      display: flex; justify-content: center; align-items: center;
+      gap: 28px; flex-wrap: wrap;
+      padding: 0 5% 70px;
+      font-size: 0.78rem; color: var(--text-muted);
+    }
+    .tech-pill {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 5px 14px;
+      color: var(--text-secondary); font-weight: 500; font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="land-nav" id="land-nav">
+    <!-- Logo → clicks to home -->
+    <a href="./index.html" class="land-logo" aria-label="PrithviNet Home">
+      <div class="logo-icon">🌿</div>
+      <div>
+        <h1>PrithviNet</h1>
+        <span>Environmental Monitoring</span>
+      </div>
+    </a>
+
+    <div class="land-nav-links">
+      <a href="#features">Features</a>
+      <a href="#benefits">Benefits</a>
+      <a href="#roles">Roles</a>
+      <a href="citizen.html">Citizen Portal</a>
+    </div>
+
+    <div class="land-nav-actions">
+      <!-- Theme toggle -->
+      <button class="nav-theme-btn" id="theme-toggle-btn" onclick="toggleLandingTheme()" aria-label="Toggle theme" title="Switch light/dark theme">
+        <span id="theme-icon">☀️</span>
+      </button>
+      <a href="login.html" class="btn btn-outline btn-sm">Login</a>
+      <a href="signup.html" class="btn btn-primary btn-sm">Get Started</a>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-particles" id="particles"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span>Live Environmental Monitoring</div>
+      <h1>Monitor. Protect.<br/><span class="gradient-text">PrithviNet.</span></h1>
+      <p>The world's most comprehensive environmental monitoring and compliance platform. Track <strong style="color:#00897B">Air</strong>, <strong style="color:#1565C0">Water</strong>, and <strong style="color:#FF8F00">Noise</strong> pollution globally in real-time with AI-powered insights — for industries, regulators, and citizens.</p>
+      <div class="hero-cta">
+        <a href="signup.html" class="btn btn-primary btn-lg">🚀 Get Started Free</a>
+        <a href="citizen.html" class="btn btn-outline btn-lg">🌱 Citizen Portal</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><strong id="stat-stations">1296+</strong><span>Monitoring Stations</span></div>
+        <div class="hero-stat"><strong id="stat-industries">8+</strong><span>Industries Tracked</span></div>
+        <div class="hero-stat"><strong id="stat-readings">10K+</strong><span>Daily Readings</span></div>
+        <div class="hero-stat"><strong id="stat-regions">180+</strong><span>Countries Covered</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Live AQI Strip -->
+  <div class="aqi-strip-label">🌍 Live Global AQI · <span id="aqi-strip-loc">Loading your location...</span></div>
+  <div class="aqi-strip" id="aqi-strip">
+    <div class="aqi-city" style="opacity:0.5"><div class="aqi-city-name">Loading...</div><div class="aqi-city-value">—</div><div class="aqi-city-label">Live AQI</div></div>
+  </div>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="section-label">Platform Features</div>
+    <h2 class="section-title">Everything You Need for<br/>Environmental Compliance</h2>
+    <p class="section-sub">From real-time monitoring to AI-powered analytics — PrithviNet covers the entire environmental compliance lifecycle.</p>
+    <div class="features-grid">
+      <div class="feature-card fade-in"><div class="feature-icon">🌡️</div><h3>Real-Time Monitoring</h3><p>Continuous data collection from air, water, and noise monitoring stations across regions with instant threshold alerts.</p></div>
+      <div class="feature-card fade-in fade-in-1"><div class="feature-icon">🗺️</div><h3>Geo-Spatial Maps</h3><p>Interactive pollution heatmaps with Leaflet.js showing real-time pollution levels, industry markers, and regional hotspots.</p></div>
+      <div class="feature-card fade-in fade-in-2"><div class="feature-icon">🏭</div><h3>Industry Compliance</h3><p>Track compliance status for all registered industries, automate violation detection, and manage enforcement workflows.</p></div>
+      <div class="feature-card fade-in fade-in-3"><div class="feature-icon">📈</div><h3>Advanced Analytics</h3><p>Monthly and yearly trend analysis, regional comparisons, and exportable reports in PDF and CSV formats.</p></div>
+      <div class="feature-card fade-in fade-in-4"><div class="feature-icon">🔮</div><h3>AI Forecasting</h3><p>Predict pollution levels for the next 24, 48, and 72 hours using linear regression on historical monitoring data.</p></div>
+      <div class="feature-card fade-in"><div class="feature-icon">🤖</div><h3>AI Assistant</h3><p>Ask environmental queries in plain language. Get compliance advice, risk analysis, and emission reduction suggestions instantly.</p></div>
+      <div class="feature-card fade-in fade-in-1"><div class="feature-icon">🔔</div><h3>Smart Alerts</h3><p>Automatic alerts when pollution exceeds limits, with escalation workflows and a full notification management system.</p></div>
+      <div class="feature-card fade-in fade-in-2"><div class="feature-icon">👥</div><h3>Citizen Portal</h3><p>Public transparency dashboard showing live pollution data, health advisories, and environmental alerts for every citizen.</p></div>
+      <div class="feature-card fade-in fade-in-3"><div class="feature-icon">🔐</div><h3>Role-Based Access</h3><p>Secure, granular access control with 5 distinct roles ensuring data security and appropriate permissions at every level.</p></div>
+    </div>
+  </section>
+
+  <!-- Benefits -->
+  <section id="benefits" class="benefits-section">
+    <div class="section-label">Why PrithviNet</div>
+    <h2 class="section-title">Protecting the Environment,<br/>Empowering Decision Makers</h2>
+    <p class="section-sub">Built for India's regulatory framework and environmental needs.</p>
+    <div class="benefits-grid">
+      <div class="benefit-item"><div class="benefit-icon" style="background:rgba(0,137,123,0.15)">⚡</div><h4>Real-Time Data</h4><p>Instant visibility into pollution levels with no data lag</p></div>
+      <div class="benefit-item"><div class="benefit-icon" style="background:rgba(21,101,192,0.15)">📋</div><h4>CPCB Compliance</h4><p>Aligned with Indian environmental regulations and standards</p></div>
+      <div class="benefit-item"><div class="benefit-icon" style="background:rgba(255,143,0,0.15)">📱</div><h4>Mobile First</h4><p>Fully responsive — works perfectly on any device</p></div>
+      <div class="benefit-item"><div class="benefit-icon" style="background:rgba(46,125,50,0.15)">🌱</div><h4>Public Transparency</h4><p>Citizen portal builds public trust and awareness</p></div>
+      <div class="benefit-item"><div class="benefit-icon" style="background:rgba(106,27,154,0.15)">🤖</div><h4>AI-Powered</h4><p>Smart forecasting and advisory using machine learning</p></div>
+      <div class="benefit-item"><div class="benefit-icon" style="background:rgba(211,47,47,0.15)">🔔</div><h4>Proactive Alerts</h4><p>Never miss a critical pollution event with smart notifications</p></div>
+    </div>
+  </section>
+
+  <!-- Roles -->
+  <section id="roles">
+    <div class="section-label">User Roles</div>
+    <h2 class="section-title">Built for Every Stakeholder</h2>
+    <p class="section-sub">Five distinct roles with tailored dashboards and appropriate access levels.</p>
+    <div class="roles-grid">
+      <div class="role-card"><div class="role-icon">👑</div><h4>Super Admin</h4><p>Full system access, user management, all data and configurations</p></div>
+      <div class="role-card"><div class="role-icon">🏛️</div><h4>Regional Officer</h4><p>Regional compliance oversight, reports and analytics</p></div>
+      <div class="role-card"><div class="role-icon">🔬</div><h4>Monitoring Team</h4><p>Data submission, station management, alert handling</p></div>
+      <div class="role-card"><div class="role-icon">🏭</div><h4>Industry User</h4><p>Compliance reports submission, own industry dashboard</p></div>
+      <div class="role-card"><div class="role-icon">🌱</div><h4>Citizen</h4><p>Public pollution dashboard, health advisories, live map</p></div>
+    </div>
+  </section>
+
+  <!-- Tech strip -->
+  <div class="tech-strip">
+    <span style="font-weight:600;color:var(--text-muted)">Powered by</span>
+    <span class="tech-pill">🛰️ WAQI API</span>
+    <span class="tech-pill">🌤️ Open-Meteo</span>
+    <span class="tech-pill">🗺️ Leaflet.js</span>
+    <span class="tech-pill">📊 Chart.js</span>
+    <span class="tech-pill">🏛️ CPCB Data</span>
+    <span class="tech-pill">🤖 AI Assistant</span>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-section">
+    <div class="section-label">Get Started Today</div>
+    <h2 class="section-title" style="margin-bottom:16px">Join PrithviNet's Environmental Mission</h2>
+    <p>Start monitoring, protecting, and reporting. Together, we can build a cleaner India.</p>
+    <div class="hero-cta">
+      <a href="signup.html" class="btn btn-primary btn-lg">Create Your Account</a>
+      <a href="login.html" class="btn btn-outline btn-lg">Login to Portal</a>
+    </div>
+  </div>
+
+  <div style="height:80px"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div>
+      <a href="./index.html" class="land-logo" style="margin-bottom:8px;display:inline-flex">
+        <div class="logo-icon" style="width:32px;height:32px;font-size:1rem">🌿</div>
+        <h1 style="font-size:1.1rem;margin:0">PrithviNet</h1>
+      </a>
+      <p>© 2026 PrithviNet. Government Environmental Monitoring Platform.</p>
+    </div>
+    <div class="footer-links">
+      <a href="citizen.html">Citizen Portal</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Contact</a>
+      <a href="#">CPCB Standards</a>
+    </div>
+  </footer>
+
+  <script src="assets/js/app.js"></script>
+  <script src="assets/js/livedata.js"></script>
+  <script>
+    // ── Theme ──────────────────────────────────────────────────────
+    function applyLandingTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('pn_theme', theme);
+      const icon = document.getElementById('theme-icon');
+      if (icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    function toggleLandingTheme() {
+      const current = localStorage.getItem('pn_theme') || 'dark';
+      applyLandingTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    // Load saved theme on page start (default to dark for home screen)
+    const savedTheme = localStorage.getItem('pn_theme') || 'dark';
+    applyLandingTheme(savedTheme);
+
+    // ── Navbar scroll effect ───────────────────────────────────────
+    window.addEventListener('scroll', () => {
+      document.getElementById('land-nav').classList.toggle('scrolled', window.scrollY > 50);
+    });
+
+    // ── Particle background ────────────────────────────────────────
+    const container = document.getElementById('particles');
+    for (let i = 0; i < 25; i++) {
+      const p = document.createElement('div');
+      p.className = 'particle';
+      const size = Math.random() * 8 + 4;
+      const colors = ['#00897B','#4DB6AC','#1565C0','#FF8F00'];
+      p.style.cssText = `
+        width:${size}px; height:${size}px;
+        left:${Math.random()*100}%;
+        animation-duration:${Math.random()*20+15}s;
+        animation-delay:${Math.random()*10}s;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+      `;
+      container.appendChild(p);
+    }
+
+    // ── Animate stats ──────────────────────────────────────────────
+    setTimeout(() => {
+      animateCounter(document.getElementById('stat-stations'),  1296,  1800, '', '+');
+      animateCounter(document.getElementById('stat-industries'), 8,     1000, '', '+');
+      animateCounter(document.getElementById('stat-readings'),  10000, 2000, '', '+');
+      animateCounter(document.getElementById('stat-regions'),   180,   1500, '', '+');
+    }, 500);
+
+    // ── Live AQI Strip ─────────────────────────────────────────────
+    const STRIP_CITIES = [
+      { name:'📍 My Area', useLocation: true },
+      { name:'Delhi',    lat:28.6139, lng:77.2090 },
+      { name:'Mumbai',   lat:19.0760, lng:72.8777 },
+      { name:'Beijing',  lat:39.9042, lng:116.4074 },
+      { name:'London',   lat:51.5074, lng:-0.1278 },
+      { name:'New York', lat:40.7128, lng:-74.0060 },
+      { name:'Lahore',   lat:31.5204, lng:74.3587 },
+      { name:'Bangkok',  lat:13.7563, lng:100.5018 },
+      { name:'Cairo',    lat:30.0444, lng:31.2357 },
+      { name:'Kolkata',  lat:22.5726, lng:88.3639 },
+      { name:'Jakarta',  lat:-6.2088, lng:106.8456 },
+      { name:'Paris',    lat:48.8566, lng:2.3522 },
+    ];
+
+    async function loadAQIStrip() {
+      try {
+        const loc = await LiveLocation.get();
+        document.getElementById('aqi-strip-loc').textContent = `${loc.city}, ${loc.country}`;
+        STRIP_CITIES[0] = { name:`📍 ${loc.city}`, lat:loc.lat, lng:loc.lng };
+      } catch(e) { STRIP_CITIES.shift(); }
+
+      const strip = document.getElementById('aqi-strip');
+      strip.innerHTML = '';
+
+      for (let i = 0; i < STRIP_CITIES.length; i += 4) {
+        const batch = STRIP_CITIES.slice(i, i+4);
+        await Promise.all(batch.map(async (c) => {
+          const data = await WAQI.getFeedByGeo(c.lat, c.lng);
+          const aqi = data?.aqi ?? '—';
+          const lvl = WAQI.aqiLevel(typeof aqi === 'number' ? aqi : null);
+          const el = document.createElement('div');
+          el.className = 'aqi-city';
+          el.innerHTML = `<div class="aqi-city-name">${c.name}</div><div class="aqi-city-value" style="color:${lvl.color}">${aqi}</div><div class="aqi-city-label" style="color:${lvl.color}">${lvl.emoji} ${lvl.label}</div>`;
+          strip.appendChild(el);
+        }));
+      }
+    }
+    loadAQIStrip();
+
+    Toast.init();
+  </script>
+</body>
+</html>

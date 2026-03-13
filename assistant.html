@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Assistant – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <style>
+    .ai-layout { display: grid; grid-template-columns: 1fr 2.2fr; gap: 20px; height: calc(100vh - 180px); min-height: 600px; }
+    @media(max-width:900px){.ai-layout{grid-template-columns:1fr;height:auto}}
+    .ai-left { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .ai-right { display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .ai-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg,rgba(0,137,123,0.15),rgba(21,101,192,0.1)); }
+    .ai-avatar { width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg,#00897B,#1565C0); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 14px rgba(0,137,123,0.4); }
+    .ai-status { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--success); }
+    .ai-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse-green 2s infinite; }
+    @keyframes pulse-green { 0%,100%{opacity:1}50%{opacity:0.4} }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .chat-msg { display: flex; gap: 10px; align-items: flex-start; }
+    .chat-msg.user { flex-direction: row-reverse; }
+    .chat-avt { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+    .chat-avt.bot-avt { background: linear-gradient(135deg,#00897B,#1565C0); }
+    .chat-avt.user-avt { background: linear-gradient(135deg,#FF8F00,#C62828); font-weight:800; color:#fff; font-size:0.9rem; }
+    .chat-bubble { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 0.85rem; line-height: 1.6; }
+    .chat-msg.bot .chat-bubble { background: var(--bg); border: 1px solid var(--border); border-top-left-radius: 4px; color: var(--text-primary); }
+    .chat-msg.user .chat-bubble { background: linear-gradient(135deg,#00897B,#1565C0); color: #fff; border-top-right-radius: 4px; }
+    .copilot-result { background: linear-gradient(135deg,rgba(0,137,123,0.08),rgba(21,101,192,0.08)); border: 1px solid rgba(0,137,123,0.3); border-radius: 12px; padding: 14px; margin-top: 4px; }
+    .chat-input-area { padding: 14px 16px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: var(--bg-card); }
+    .chat-input-area input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 24px; padding: 10px 18px; color: var(--text-primary); font-size: 0.88rem; outline: none; transition: border 0.2s; }
+    .chat-input-area input:focus { border-color: var(--primary); }
+    .send-btn { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg,#00897B,#1565C0); border: none; color: #fff; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.15s; }
+    .send-btn:hover { transform: scale(1.1); }
+    .send-btn:disabled { opacity: 0.5; transform: none; }
+    .quick-btn { width: 100%; text-align: left; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; color: var(--text-primary); cursor: pointer; font-size: 0.8rem; line-height: 1.4; transition: all 0.15s; }
+    .quick-btn:hover { background: rgba(0,137,123,0.12); border-color: var(--primary); color: var(--primary); }
+    .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.8px; padding: 4px 0 6px; }
+    .typing-dots span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); margin: 0 2px; animation: typing-bounce 1.2s infinite; }
+    .typing-dots span:nth-child(2){animation-delay:0.2s}
+    .typing-dots span:nth-child(3){animation-delay:0.4s}
+    @keyframes typing-bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-8px)}}
+    .model-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; background: rgba(0,137,123,0.15); border: 1px solid rgba(0,137,123,0.3); font-size: 0.7rem; color: var(--primary); font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+        <div class="page-header fade-in" style="margin-bottom:16px">
+          <div>
+            <h1>🤖 AI Compliance Copilot</h1>
+            <p>Causal emission modeling · Intervention simulation · Real CG data</p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <span class="model-badge">🧠 Causal Graph Model</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearChat()">🗑️ Clear</button>
+          </div>
+        </div>
+
+        <div class="ai-layout fade-in">
+          <!-- Left: Quick Questions -->
+          <div class="ai-left">
+            <div class="card p-3">
+              <div class="section-label">🔬 Intervention Simulations</div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">If Bhilai Steel Plant reduces PM2.5 by 30%, what is the expected change in regional risk over the next week?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">What happens if the top 2 high-risk units are temporarily shut down during a festival period?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">If NTPC Korba cuts SO2 by 20%, will it become compliant?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">If BALCO Aluminium reduces emissions by 40%, what is the regional AQI impact?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">If Raipur Sponge Iron reduces PM2.5 by 50%, what changes over 7 days?</button>
+              </div>
+            </div>
+            <div class="card p-3">
+              <div class="section-label">💧 Water & Noise</div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">What is the water quality in Sheonath River?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">Which industries have noise violations in Chhattisgarh?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">What is the BOD level in Hasdeo River near Korba?</button>
+              </div>
+            </div>
+            <div class="card p-3">
+              <div class="section-label">📊 Compliance & Forecast</div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">72-hour pollution forecast for Chhattisgarh</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">Which industries in CG are non-compliant with CPCB norms?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">CPCB penalties for repeated violations in India</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">How to reduce SO2 from thermal power plants like NTPC?</button>
+                <button class="quick-btn" onclick="sendQuick(this.textContent)">What is the health risk of AQI 221 in Bhilai?</button>
+              </div>
+            </div>
+            <div class="card p-3" style="background:linear-gradient(135deg,rgba(0,137,123,0.1),rgba(21,101,192,0.08));border-color:rgba(0,137,123,0.3)">
+              <div class="section-label">🧠 How AI Works</div>
+              <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.7">
+                <div>📐 <strong>Causal graph:</strong> Emissions → Wind dispersion → Regional AQI → Population risk</div>
+                <div style="margin-top:6px">🔬 <strong>Surrogate model:</strong> Industry-specific transfer functions with atmospheric mixing time delay</div>
+                <div style="margin-top:6px">📡 <strong>Data:</strong> 12 real CG stations · 8 industries · Live Open-Meteo API</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Chat -->
+          <div class="ai-right">
+            <div class="ai-header">
+              <div class="ai-avatar">🤖</div>
+              <div>
+                <div style="font-weight:700;font-size:1rem">PrithviNet AI Compliance Copilot</div>
+                <div class="ai-status">Online · Environmental Intelligence Expert</div>
+                <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">Chhattisgarh Industrial Zone · March 2026</div>
+              </div>
+            </div>
+
+            <div class="chat-messages" id="chat-messages"></div>
+
+            <div class="chat-input-area">
+              <input id="chat-input" placeholder="Ask: 'If Bhilai reduces PM2.5 by 30%, what changes?'" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"/>
+              <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+initApp('AI Assistant');
+const user = Auth.getUser();
+
+// ── Causal Emission Model ─────────────────────────────────────────────────────
+const EM = {
+  'Bhilai Steel Plant (BSP)':{aqi:221,pm25:167.4,so2:148,no2:112,wf:0.80,ri:0.45,sector:'Steel Manufacturing'},
+  'NTPC Korba':              {aqi:142,pm25:72.1, so2:218,no2:68, wf:0.70,ri:0.52,sector:'Thermal Power'},
+  'BALCO Aluminium':         {aqi:182,pm25:141.6,so2:88, no2:94, wf:0.75,ri:0.48,sector:'Aluminium Smelting'},
+  'Raipur Cement Works':     {aqi:138,pm25:98.3, so2:55, no2:72, wf:0.85,ri:0.35,sector:'Cement'},
+  'Raipur Sponge Iron':      {aqi:165,pm25:124.2,so2:62, no2:88, wf:0.82,ri:0.38,sector:'Sponge Iron'},
+};
+
+function simReduce(ind, pollutant, pct, days) {
+  const e=EM[ind]; if(!e)return null;
+  const frac=pct/100;
+  const localDrop=e.aqi*frac*0.72, newAQI=Math.max(0,e.aqi-localDrop);
+  const regB=e.aqi*e.ri*e.wf, regA=newAQI*e.ri*e.wf;
+  const riskB=Math.min(100,Math.max(0,(e.aqi-100)/2)), riskA=Math.min(100,Math.max(0,(newAQI-100)/2));
+  let pdrop=0,punit='µg/m³';
+  if(/pm2?\.?5/i.test(pollutant))pdrop=e.pm25*frac;
+  else if(/so2/i.test(pollutant)){pdrop=e.so2*frac;punit='ppm';}
+  else if(/no2/i.test(pollutant))pdrop=e.no2*frac;
+  else pdrop=e.pm25*frac;
+  const delay=Math.max(1,Math.round(days*0.3));
+  const lvlB=aqiE(e.aqi),lvlA=aqiE(newAQI);
+  return `<div class="copilot-result">
+    <div style="font-size:1rem;font-weight:800;margin-bottom:10px">🔬 Emission Reduction Simulation</div>
+    <table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Industry</td><td style="padding:5px 0;font-weight:700">${ind}</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Reduction</td><td style="padding:5px 0;font-weight:700">${pct}% of ${pollutant} over ${days} days</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Local AQI</td><td style="padding:5px 0"><strong>${Math.round(e.aqi)}</strong> ${lvlB} → <strong>${Math.round(newAQI)}</strong> ${lvlA} <span style="color:var(--success)">(↓ ${Math.round(localDrop)} pts)</span></td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">${pollutant} change</td><td style="padding:5px 0;color:var(--success)">↓ ${pdrop.toFixed(1)} ${punit}</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Regional AQI impact</td><td style="padding:5px 0;color:var(--success)">↓ ${Math.round(regB-regA)} pts to surrounding region</td></tr>
+      <tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Risk score</td><td style="padding:5px 0"><strong>${Math.round(riskB)}/100</strong> → <strong>${Math.round(riskA)}/100</strong> <span style="color:var(--success)">(↓ ${Math.round(riskB-riskA)} pts)</span></td></tr>
+      <tr><td style="padding:5px 0;color:var(--text-muted)">Compliance</td><td style="padding:5px 0;font-weight:800;color:${newAQI<=100?'var(--success)':'var(--warning)'}">${newAQI<=100?'✅ COMPLIANT after reduction':'⚠️ Still exceeding limit (need more action)'}</td></tr>
+    </table>
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+      ⏱️ Observable effect: <strong>${delay}–${delay+2} days</strong> (atmospheric mixing delay) &nbsp;|&nbsp;
+      🌬️ Wind dispersion factor: <strong>${(e.wf*100).toFixed(0)}%</strong> &nbsp;|&nbsp;
+      📡 Regional impact radius: <strong>${(e.ri*100).toFixed(0)}%</strong>
+    </div>
+  </div>`;
+}
+
+function simShutdown(names, days) {
+  const total = Object.values(EM).reduce((s,e) => s + e.aqi * e.ri, 0);
+  let after = total;
+  const details = [];
+  names.forEach(n => {
+    const e = EM[n]; if(!e) return;
+    const c = e.aqi * e.ri; after -= c;
+    details.push({n, c:Math.round(c), aqi:e.aqi});
+  });
+  const nn = Object.keys(EM).length;
+  const improv = Math.round(((total - after) / total) * 100);
+  const saved = Math.round(improv * 0.8 * days);
+  const feasLabel = days <= 3 ? 'HIGH ✅ Recommended' : days <= 7 ? 'MEDIUM ⚠️ Economic review needed' : 'LOW ❌ Major disruption';
+  const detailsHTML = details.map(d =>
+    '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:rgba(198,40,40,0.1);border-radius:6px;margin-bottom:4px;font-size:0.8rem">' +
+    '<span>🏭 ' + d.n + '</span><span style="color:var(--danger)">AQI ' + d.aqi + ' — contrib. ' + d.c + '</span></div>'
+  ).join('');
+  return '<div class="copilot-result">' +
+    '<div style="font-size:1rem;font-weight:800;margin-bottom:10px">🏭 Festival/Emergency Shutdown Simulation</div>' +
+    '<div style="font-size:0.82rem;font-weight:700;margin-bottom:8px">Units stopped (' + days + ' days):</div>' +
+    detailsHTML +
+    '<table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:10px">' +
+    '<tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Avg regional AQI</td><td style="padding:5px 0;font-weight:700">' + Math.round(total/nn) + ' → <strong style="color:var(--success)">' + Math.round(after/nn) + '</strong> (↓ ' + improv + '% improvement)</td></tr>' +
+    '<tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 0;color:var(--text-muted)">Hospital visits saved</td><td style="padding:5px 0;color:var(--success);font-weight:700">~' + saved + ' in CG industrial zone</td></tr>' +
+    '<tr><td style="padding:5px 0;color:var(--text-muted)">Feasibility (' + days + ' days)</td><td style="padding:5px 0;font-weight:800">' + feasLabel + '</td></tr>' +
+    '</table>' +
+    '<div style="font-size:0.72rem;color:var(--text-muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">⚠️ Mandatory CECB order required. Economic impact assessment recommended.</div>' +
+    '</div>';
+}
+
+
+function aqiE(a){if(a<=50)return'🌿';if(a<=100)return'😐';if(a<=150)return'😷';if(a<=200)return'😨';if(a<=300)return'🚨';return'☠️';}
+
+// ── Knowledge Base ─────────────────────────────────────────────────────────────
+const KB = [
+  {k:['hello','hi','hey','namaste'],r:'Hello! I am PrithviNet AI Compliance Copilot 🌿<br><br>I specialize in <strong>Chhattisgarh industrial pollution</strong> with causal simulation capabilities.<br><br>Try: <em>"If Bhilai reduces PM2.5 by 30%, what changes?"</em>'},
+  {k:['pm2.5','pm25','fine particle'],r:'<strong>PM2.5 Status — Chhattisgarh (March 2026)</strong><br><br>India safe limit: <strong>60 µg/m³</strong> (24h avg)<br><br><table style="font-size:0.82rem;width:100%;border-collapse:collapse"><tr><td style="padding:4px 0;color:var(--danger)">🔴 Bhilai Steel Plant</td><td style="font-weight:700;padding:4px 0">167.4 µg/m³ (2.8× limit!)</td></tr><tr><td style="padding:4px 0;color:var(--danger)">🔴 BALCO Aluminium</td><td style="font-weight:700;padding:4px 0">141.6 µg/m³ (2.4× limit)</td></tr><tr><td style="padding:4px 0;color:var(--danger)">🔴 Raipur Sponge Iron</td><td style="font-weight:700;padding:4px 0">124.2 µg/m³ (2.1× limit)</td></tr><tr><td style="padding:4px 0;color:var(--warning)">🟡 NTPC Korba</td><td style="font-weight:700;padding:4px 0">72.1 µg/m³ (1.2× limit)</td></tr><tr><td style="padding:4px 0;color:var(--success)">🟢 CSPDCL</td><td style="font-weight:700;padding:4px 0">45.8 µg/m³ ✅ Compliant</td></tr></table>'},
+  {k:['so2','sulphur','sulfur'],r:'<strong>SO₂ Status — Chhattisgarh</strong><br><br>Stack limit: <strong>200 ppm</strong><br><br>🔴 <strong>NTPC Korba: 218 ppm</strong> — BREACH (Unit-3 malfunction)<br>🟢 Bhilai Steel: 148 ppm — OK<br>🟢 BALCO: 88 ppm — OK<br><br><strong>Action for NTPC:</strong> Activate FGD on Unit-3 or reduce coal feed by 15% immediately.'},
+  {k:['water','bod','river','sheonath','hasdeo','mahanadi'],r:'<strong>River Water Quality — Chhattisgarh</strong><br><br>BOD safe limit: <strong>30 mg/L</strong><br><br><table style="font-size:0.82rem;width:100%;border-collapse:collapse"><tr><td style="padding:4px;color:var(--danger)">🔴 Sheonath River (Durg)</td><td style="font-weight:800">BOD: 48 mg/L 🚨</td><td>CRITICAL — fish die-off risk!</td></tr><tr><td style="padding:4px;color:var(--danger)">🔴 BALCO effluent</td><td style="font-weight:800">BOD: 52.3 mg/L</td><td>Non-compliant ETP</td></tr><tr><td style="padding:4px;color:var(--warning)">🟡 Hasdeo River (Korba)</td><td style="font-weight:800">BOD: 31.5 mg/L</td><td>Marginal</td></tr><tr><td style="padding:4px;color:var(--success)">🟢 Mahanadi (Raipur)</td><td style="font-weight:800">BOD: 22.8 mg/L</td><td>Safe</td></tr><tr><td style="padding:4px;color:var(--success)">🟢 Arpa River (Bilaspur)</td><td style="font-weight:800">BOD: 18.6 mg/L</td><td>Safe</td></tr></table>'},
+  {k:['noise','decibel','sound'],r:'<strong>Noise Violations — Chhattisgarh</strong><br><br>Industrial limit: <strong>75 dB (day) / 70 dB (night)</strong><br><br>🔴 Raipur Cement Works: <strong>84 dB</strong> — +9 dB over limit!<br>🔴 BALCO Aluminium: <strong>79.8 dB</strong> — +4.8 dB over<br>🔴 Bhilai Steel Plant: <strong>81.5 dB</strong> — over limit<br><br>Health: Prolonged >75 dB → hearing loss + cardiovascular disease'},
+  {k:['bhilai','bsp'],r:'<strong>Bhilai Steel Plant (BSP) — CG-IND-001</strong><br>Status: 🔴 <strong>NON-COMPLIANT</strong><br><br><table style="font-size:0.82rem;width:100%;border-collapse:collapse"><tr><td style="padding:4px;color:var(--text-muted)">AQI</td><td style="font-weight:800;color:var(--danger)">221 (limit: 100) — 121% over!</td></tr><tr><td style="padding:4px;color:var(--text-muted)">PM2.5</td><td style="font-weight:800;color:var(--danger)">167.4 µg/m³ — 179% over!</td></tr><tr><td style="padding:4px;color:var(--text-muted)">BOD</td><td style="font-weight:800;color:var(--warning)">44.2 mg/L — 47% over</td></tr><tr><td style="padding:4px;color:var(--text-muted)">Noise</td><td style="font-weight:800;color:var(--danger)">81.5 dB — over limit</td></tr><tr><td style="padding:4px;color:var(--text-muted)">SO₂</td><td style="font-weight:800;color:var(--success)">148 ppm — ✅ OK</td></tr></table><br>💰 Penalty: ₹1 lakh/day applicable. Compliance report overdue.'},
+  {k:['ntpc','korba'],r:'<strong>NTPC Korba (2600 MW) — CG-IND-002</strong><br>Status: 🟡 <strong>1 VIOLATION</strong><br><br>• SO₂: <strong>218 ppm</strong> 🔴 (Limit: 200 — Unit-3 breach)<br>• AQI: 95 ✅ | PM2.5: 72.1 µg/m³ 🟡 | Noise: 63.2 dB ✅<br><br><strong>Immediate action:</strong> Activate Flue Gas Desulfurization (FGD) on Unit-3.'},
+  {k:['balco'],r:'<strong>BALCO Aluminium — CG-IND-003 (Vedanta)</strong><br>Status: 🔴 <strong>NON-COMPLIANT</strong><br><br>• AQI: 182 🔴 | PM2.5: 141.6 🔴 | BOD: 52.3 mg/L 🔴 | Noise: 79.8 dB 🔴<br><br>Show Cause Notice issued. ETP upgrade ordered within 90 days.'},
+  {k:['compliance','non-compliant','penalty','fine','cpcb','cecb'],r:'<strong>CG Compliance Status — March 2026</strong><br><br>✅ Compliant (3/8): NTPC Korba, CSPDCL, Bilaspur Paper<br>❌ Non-Compliant (3/8): BSP, BALCO, Raipur Sponge Iron<br>🔄 Under Review (2/8): Raipur Cement, Raigarh Ferro Alloys<br><br><strong>Penalties (EPA 1986):</strong><br>• ₹1 lakh/day for continued violations<br>• Up to 5 years imprisonment (Sec 15)<br>• NGT damages — polluter pays principle<br>• CECB: 0771-2282000 | cecb@cg.gov.in'},
+  {k:['forecast','predict','72','next week','future'],r:'<strong>72-Hour CG Pollution Forecast</strong><br><br>📅 Tomorrow (Mar 14): AQI ~210–230 🔴 (NW industrial winds)<br>📅 Day 2 (Mar 15): AQI ~195–215 🔴 (slight improvement)<br>📅 Day 3 (Mar 16): AQI ~175–195 🔴 (gradual recovery)<br><br>🌬️ NW winds carrying Bhilai-Durg emissions toward Raipur<br>🌡️ 34–38°C — thermal inversion risk at night (traps pollutants)<br>💧 No rainfall forecast — no natural pollutant washout'},
+  {k:['health','safe','risk','exposure','danger'],r:'<strong>Health Risk — CG Industrial Zones</strong><br><br><table style="font-size:0.82rem;width:100%;border-collapse:collapse"><tr><td style="padding:4px;font-weight:700">Bhilai/Durg</td><td style="color:var(--danger)">AQI 221 — ⛔ Stay indoors, N95 mask mandatory</td></tr><tr><td style="padding:4px;font-weight:700">Korba</td><td style="color:var(--danger)">AQI 158 — Limit all outdoor activity</td></tr><tr><td style="padding:4px;font-weight:700">Raipur</td><td style="color:var(--warning)">AQI 118 — Sensitive groups stay indoors</td></tr><tr><td style="padding:4px;font-weight:700">Bilaspur</td><td style="color:var(--success)">AQI 89 — Relatively safe</td></tr></table><br>Helpline: CPCB <strong>1800-11-4399</strong> (toll-free)'},
+  {k:['reduce','solution','how to','fix','improve'],r:'<strong>Emission Reduction Strategies</strong><br><br><strong>For PM2.5/AQI:</strong><br>• Electrostatic Precipitators (ESP) — 99% particle removal<br>• Bag filter upgrades on blast furnaces<br>• Water sprinklers at coal handling areas<br><br><strong>For SO₂:</strong><br>• Flue Gas Desulfurization (FGD) units<br>• Reduce sulfur content in coal blend<br>• Wet scrubber installation<br><br><strong>For Water (BOD):</strong><br>• ETP upgrade to zero-liquid discharge<br>• Online BOD sensor + real-time monitoring<br><br>💡 Expected: 30–40% improvement within 90 days with full implementation'},
+  {k:['aqi','air quality index','what is aqi'],r:'<strong>AQI Scale (India — CPCB)</strong><br><br>🌿 0–50 → Good | 😐 51–100 → Moderate | 😷 101–150 → Unhealthy (Sensitive Groups) | 😨 151–200 → Unhealthy | 🚨 201–300 → Very Unhealthy | ☠️ 301+ → Hazardous<br><br><strong>Chhattisgarh now:</strong> Bhilai: 221 🚨 | Korba: 158 😨 | Raipur: 118 😷 | Bilaspur: 89 😐'},
+  {k:['thank','thanks','great','helpful'],r:'Glad I could help! 🌿 Breathe clean air, stay safe. 💚'},
+];
+
+// ── UI Functions ──────────────────────────────────────────────────────────────
+function addMessage(html, type='bot') {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `chat-msg ${type}`;
+  const initials = (user?.name||'U')[0].toUpperCase();
+  const avt = type==='user'
+    ? `<div class="chat-avt user-avt">${initials}</div>`
+    : `<div class="chat-avt bot-avt">🤖</div>`;
+  div.innerHTML = `${type==='user'?'':avt}<div class="chat-bubble">${html}</div>${type==='user'?avt:''}`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addTyping() {
+  const msgs = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.id = 'typing-ind'; div.className = 'chat-msg bot';
+  div.innerHTML = `<div class="chat-avt bot-avt">🤖</div><div class="chat-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeTyping() { document.getElementById('typing-ind')?.remove(); }
+
+function clearChat() {
+  document.getElementById('chat-messages').innerHTML = '';
+  addMessage('Chat cleared! 🌿 Ask me anything about Chhattisgarh pollution data or emission simulations.');
+}
+
+// ── AI Logic ──────────────────────────────────────────────────────────────────
+function getReply(input) {
+  const q = input.toLowerCase().trim();
+
+  // Pattern 1: "if [X] reduces [pollutant] by [N]% [over N days]"
+  const rm = input.match(/(?:if\s+)?(.+?)\s+(?:reduces?|cut|lower|decrease)s?\s+(?:emissions?\s+of\s+)?([a-zA-Z0-9\.\s]+?)\s+by\s+(\d+)\s*%/i);
+  if (rm) {
+    const rawInd = rm[1].trim(), pollutant = rm[2].trim(), pct = parseInt(rm[3]);
+    const days = parseInt((input.match(/(\d+)\s*(?:day|week)/i)||[])[1]||7);
+    const indKey = Object.keys(EM).find(k=>k.toLowerCase().includes(rawInd.toLowerCase().split(' ')[0])||rawInd.toLowerCase().includes(k.toLowerCase().split(' ')[0]));
+    if (indKey) return simReduce(indKey, pollutant, pct, days||7);
+    return `❌ Industry not found. Available: <em>${Object.keys(EM).join(', ')}</em>`;
+  }
+
+  // Pattern 2: shutdown/festival
+  if (q.includes('shut')||q.includes('festival')||q.includes('top high risk')||q.includes('temporarily')) {
+    const nm=q.match(/top\s*(\d+)/i); const n=nm?Math.min(parseInt(nm[1]),5):2;
+    const days=parseInt((input.match(/(\d+)\s*day/i)||[])[1]||3);
+    const top=Object.entries(EM).sort((a,b)=>b[1].aqi-a[1].aqi).slice(0,n).map(([k])=>k);
+    return simShutdown(top, days||3);
+  }
+
+  // Pattern 3: industry mentioned + reduction shortcut
+  const indK=Object.keys(EM).find(k=>q.includes(k.toLowerCase().split(' ')[0]));
+  if(indK&&(q.includes('reduc')||q.includes('cut')||q.includes('lower')||q.includes('emission')||q.includes('impact'))){
+    const pm=input.match(/(\d+)\s*%/); const pct=pm?parseInt(pm[1]):30;
+    const pol=/so2/i.test(q)?'SO₂':/no2/i.test(q)?'NO₂':'PM2.5';
+    const days=parseInt((input.match(/(\d+)\s*(?:day|week)/i)||[])[1]||7);
+    return simReduce(indK, pol, pct, days||7);
+  }
+
+  // KB lookup
+  for(const e of KB) if(e.k.some(k=>q.includes(k))) return e.r;
+  return '🌿 I specialize in Chhattisgarh environmental data. Try:<br>• <em>"If Bhilai reduces PM2.5 by 30%, what happens?"</em><br>• <em>"Festival shutdown of top 2 units"</em><br>• <em>"Water quality in Sheonath River"</em><br>• <em>"NTPC Korba SO2 compliance"</em>';
+}
+
+function sendQuick(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim(); if(!text) return;
+  input.value = '';
+  addMessage(text, 'user');
+  addTyping();
+  document.getElementById('send-btn').disabled = true;
+  await new Promise(r=>setTimeout(r, 700+Math.random()*600));
+  removeTyping();
+  document.getElementById('send-btn').disabled = false;
+  addMessage(getReply(text), 'bot');
+}
+
+// Boot
+addMessage('👋 Hello! I am <strong>PrithviNet AI Compliance Copilot</strong><br><br>I use a <strong>causal emission model</strong> to simulate interventions:<br>• Emission → Wind dispersion → Regional AQI → Population risk<br><br>🔬 Try: <em>"If Bhilai Steel Plant reduces PM2.5 by 30%, what is the regional risk change?"</em><br>🏭 Or: <em>"What happens if top 2 high-risk units shut down during festival?"</em>');
+</script>
+</body>
+</html>

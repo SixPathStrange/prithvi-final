@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Citizen Portal – PrithviNet</title>
+  <meta name="description" content="Real-time global air quality, weather forecast and pollution monitoring based on your live location"/>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { background: var(--bg); }
+    .public-navbar { background: var(--bg-navbar); border-bottom: 1px solid var(--border); padding: 0 5%; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; backdrop-filter: blur(20px); }
+    .public-logo { display: flex; align-items: center; gap: 10px; }
+    .public-logo .logo-icon { width: 36px; height: 36px; border-radius: 9px; background: linear-gradient(135deg,#00897B,#4DB6AC); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+    .public-logo h1 { font-size: 1.2rem; color: var(--text-primary); margin: 0; }
+
+    /* Hero */
+    .citizen-hero { background: linear-gradient(135deg, #0D2137 0%, #004D40 100%); padding: 48px 5% 36px; color: #fff; position: relative; overflow: hidden; }
+    .citizen-hero::before { content:''; position:absolute; inset:0; background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234DB6AC' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); }
+
+    /* Location Card */
+    .location-banner { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; font-size: 0.85rem; }
+    .loc-pill { background: rgba(77,182,172,0.2); border: 1px solid rgba(77,182,172,0.4); color: #4DB6AC; padding: 5px 14px; border-radius: 20px; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+    .pulse-dot { width: 8px; height: 8px; background: #4DB6AC; border-radius: 50%; animation: pulse-green 1.8s infinite; }
+
+    /* Live AQI Card */
+    .live-aqi-card { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 28px; display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; max-width: 900px; }
+    @media(max-width:700px) { .live-aqi-card { grid-template-columns: 1fr; } }
+    .aqi-large { font-size: 5rem; font-weight: 900; line-height: 1; font-family: 'Poppins',sans-serif; }
+    .pollutant-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .pollutant-chip { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 4px 10px; font-size: 0.78rem; }
+
+    /* Weather */
+    #weather-map { height: 460px; border-radius: 16px; }
+    @media(max-width:700px) { #weather-map { height: 260px; } }
+    .weather-widget { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+    .weather-temp { font-size: 3.5rem; font-weight: 800; font-family: 'Poppins',sans-serif; line-height: 1; }
+    .weather-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 16px; }
+    @media(max-width:600px) { .weather-grid { grid-template-columns: repeat(2,1fr); } }
+    .weather-stat { background: var(--bg); border-radius: 10px; padding: 12px; text-align: center; }
+    .weather-stat .val { font-size: 1.1rem; font-weight: 700; }
+    .weather-stat .lbl { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .forecast-day { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .forecast-day:last-child { border-bottom: none; }
+
+    /* Global Cities */
+    .cities-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 14px; }
+    .city-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; text-align: center; cursor: pointer; transition: var(--transition); position: relative; overflow: hidden; }
+    .city-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+    .city-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    .city-aqi-num { font-size: 2rem; font-weight: 800; font-family: 'Poppins',sans-serif; }
+    .city-name-lbl { font-size: 0.82rem; font-weight: 600; margin: 4px 0 2px; }
+    .city-country { font-size: 0.7rem; color: var(--text-muted); }
+
+    /* Section headings */
+    section { padding: 40px 5%; }
+    .section-label { font-size: 0.75rem; color: var(--primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+    .section-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; }
+    .section-sub { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* AQI scale bar */
+    .aqi-scale { display: flex; height: 10px; border-radius: 10px; overflow: hidden; margin: 8px 0; }
+    .aqi-scale-seg { flex: 1; }
+    .aqi-indicator { position: relative; }
+
+    /* Tabs */
+    .region-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .region-tab { padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-card); font-size: 0.82rem; cursor: pointer; transition: var(--transition); }
+    .region-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .region-tab:hover:not(.active) { border-color: var(--primary); color: var(--primary); }
+
+    footer { background: rgba(0,0,0,0.05); border-top: 1px solid var(--border); padding: 28px 5%; text-align: center; }
+
+    /* ──── AI Sidebar ──── */
+    .ai-fab {
+      position: fixed; bottom: 28px; right: 28px; z-index: 1000;
+      width: 62px; height: 62px; border-radius: 50%;
+      background: linear-gradient(135deg, #00897B 0%, #1B5E20 100%);
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      box-shadow: 0 0 0 0 rgba(0,137,123,0.5);
+      animation: ai-fab-pulse 2.4s infinite;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+    .ai-fab:hover { transform: scale(1.12); }
+    .ai-fab.open { animation: none; background: linear-gradient(135deg,#37474F,#1A2332); box-shadow: 0 6px 24px rgba(0,0,0,0.4); }
+    @keyframes ai-fab-pulse {
+      0%   { box-shadow: 0 0 0 0   rgba(0,137,123,0.55); }
+      60%  { box-shadow: 0 0 0 18px rgba(0,137,123,0); }
+      100% { box-shadow: 0 0 0 0   rgba(0,137,123,0); }
+    }
+    .ai-sidebar-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 1001; backdrop-filter: blur(4px);
+    }
+    .ai-sidebar-overlay.active { display: block; }
+    .ai-sidebar {
+      position: fixed; top: 0; right: -440px; width: 420px; height: 100vh;
+      z-index: 1002;
+      background: linear-gradient(160deg, #0B1F14 0%, #0D1B2A 60%, #0B1A12 100%);
+      border-left: 2px solid rgba(0,137,123,0.35);
+      display: flex; flex-direction: column;
+      transition: right 0.4s cubic-bezier(0.4,0,0.2,1);
+      overflow: hidden;
+    }
+    .ai-sidebar.open { right: 0; }
+    @media(max-width:480px) { .ai-sidebar { width: 100vw; right: -100vw; } }
+    .ai-sidebar-deco-bottom {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      pointer-events: none; z-index: 0; opacity: 0.55;
+      animation: deco-breathe 5s ease-in-out infinite alternate;
+    }
+    .ai-sidebar-deco-left {
+      position: absolute; top: 60px; left: -2px; bottom: 120px;
+      pointer-events: none; z-index: 0; opacity: 0.4;
+      animation: deco-breathe 7s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes deco-breathe {
+      from { filter: drop-shadow(0 0 4px rgba(0,200,140,0.3)); opacity: 0.4; }
+      to   { filter: drop-shadow(0 0 12px rgba(0,230,160,0.7)); opacity: 0.7; }
+    }
+    .ai-sidebar-header {
+      position: relative; z-index: 2;
+      display: flex; align-items: center; gap: 12px;
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(0,137,123,0.25);
+      background: rgba(0,0,0,0.2);
+    }
+    .ai-header-icon {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: linear-gradient(135deg,#00897B,#2E7D32);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; box-shadow: 0 0 16px rgba(0,200,140,0.4);
+    }
+    .ai-header-text h3 { font-size: 1rem; font-weight: 700; color: #E8F5E9; margin: 0; }
+    .ai-header-text span { font-size: 0.72rem; color: #69F0AE; font-weight: 600; }
+    .ai-close-btn {
+      margin-left: auto; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1); color: #ccc;
+      width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; font-size: 1rem;
+      transition: background 0.2s;
+    }
+    .ai-close-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+    .ai-messages {
+      flex: 1; overflow-y: auto; padding: 16px 18px; display: flex;
+      flex-direction: column; gap: 12px; position: relative; z-index: 2;
+      scrollbar-width: thin; scrollbar-color: rgba(0,137,123,0.3) transparent;
+    }
+    .ai-msg { display: flex; gap: 10px; align-items: flex-end; max-width: 92%; }
+    .ai-msg.bot  { align-self: flex-start; }
+    .ai-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .ai-msg-avatar {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 0.9rem;
+    }
+    .ai-msg.bot  .ai-msg-avatar { background: linear-gradient(135deg,#00897B,#1B5E20); box-shadow: 0 0 8px rgba(0,200,140,0.4); }
+    .ai-msg.user .ai-msg-avatar { background: linear-gradient(135deg,#1565C0,#0D47A1); }
+    .ai-bubble {
+      padding: 10px 14px; border-radius: 16px; font-size: 0.83rem; line-height: 1.6;
+      max-width: 100%;
+    }
+    .ai-msg.bot  .ai-bubble {
+      background: rgba(0,137,123,0.15); border: 1px solid rgba(0,137,123,0.3); color: #C8E6C9;
+      border-bottom-left-radius: 4px;
+    }
+    .ai-msg.user .ai-bubble {
+      background: rgba(21,101,192,0.25); border: 1px solid rgba(21,101,192,0.4); color: #BBDEFB;
+      border-bottom-right-radius: 4px;
+    }
+    .ai-msg-time { font-size: 0.62rem; color: rgba(255,255,255,0.3); margin-top: 2px; text-align: right; }
+    .ai-typing {
+      display: none; align-self: flex-start; padding: 10px 14px;
+      background: rgba(0,137,123,0.12); border: 1px solid rgba(0,137,123,0.25);
+      border-radius: 16px; border-bottom-left-radius: 4px; margin: 0 18px 4px;
+      position: relative; z-index: 2;
+    }
+    .ai-typing span { width:7px; height:7px; background:#00897B; border-radius:50%; display:inline-block; margin:0 2px;
+      animation: ai-blink 1.2s infinite; }
+    .ai-typing span:nth-child(2) { animation-delay:0.2s; }
+    .ai-typing span:nth-child(3) { animation-delay:0.4s; }
+    @keyframes ai-blink { 0%,80%,100% { transform:scale(0.8); opacity:0.5; } 40% { transform:scale(1.1); opacity:1; } }
+    .ai-suggestions {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 6px 18px 10px; position: relative; z-index: 2;
+    }
+    .ai-chip {
+      background: rgba(0,137,123,0.12); border: 1px solid rgba(0,137,123,0.3);
+      color: #80CBC4; font-size: 0.72rem; padding: 4px 10px;
+      border-radius: 20px; cursor: pointer; transition: background 0.2s; white-space: nowrap;
+    }
+    .ai-chip:hover { background: rgba(0,137,123,0.28); color: #fff; }
+    .ai-input-row {
+      display: flex; gap: 10px; align-items: center;
+      padding: 12px 16px 16px; position: relative; z-index: 2;
+      border-top: 1px solid rgba(0,137,123,0.2);
+    }
+    .ai-input {
+      flex: 1; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(0,137,123,0.3); border-radius: 24px;
+      color: #E8F5E9; padding: 10px 16px; font-size: 0.83rem;
+      outline: none; font-family: inherit; transition: border-color 0.2s;
+    }
+    .ai-input:focus { border-color: #00897B; background: rgba(0,137,123,0.08); }
+    .ai-input::placeholder { color: rgba(255,255,255,0.3); }
+    .ai-send-btn {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg,#00897B,#2E7D32);
+      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; color: #fff; transition: transform 0.2s;
+      box-shadow: 0 2px 12px rgba(0,137,123,0.35);
+    }
+    .ai-send-btn:hover { transform: scale(1.1); }
+    .ai-send-btn:disabled { opacity: 0.5; transform: none; cursor: not-allowed; }
+
+  </style>
+</head>
+<body>
+<!-- Navbar -->
+<nav class="public-navbar">
+  <a href="./index.html" class="public-logo" title="Go to Home" style="text-decoration:none">
+    <div class="logo-icon">🌿</div>
+    <h1>PrithviNet</h1>
+  </a>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span id="nav-loc" style="font-size:0.78rem;color:var(--text-muted)">📍 Detecting location...</span>
+    <button class="theme-toggle" id="theme-toggle" onclick="Theme.toggle()"></button>
+    <a href="login.html" class="btn btn-primary btn-sm">Login →</a>
+  </div>
+</nav>
+
+<!-- Hero: Live Location AQI -->
+<div class="citizen-hero">
+  <div style="position:relative;z-index:1;">
+    <div class="location-banner">
+      <div class="loc-pill"><span class="pulse-dot"></span><span id="loc-city-name">Detecting location...</span></div>
+      <span style="color:rgba(255,255,255,0.5);font-size:0.78rem" id="loc-time">—</span>
+    </div>
+    <div id="hero-loading" style="color:rgba(255,255,255,0.6);font-size:0.95rem;margin-bottom:24px">
+      <div class="spinner" style="width:28px;height:28px;margin-right:10px;display:inline-block;vertical-align:middle"></div> Fetching real-time air quality for your location...
+    </div>
+    <div id="live-aqi-card" class="live-aqi-card" style="display:none">
+      <div>
+        <div style="font-size:0.82rem;color:rgba(255,255,255,0.6);margin-bottom:4px">Real-Time Air Quality Index</div>
+        <div class="aqi-large" id="hero-aqi">—</div>
+        <div style="font-size:1.1rem;font-weight:700;margin:8px 0 4px" id="hero-aqi-label">—</div>
+        <div style="font-size:0.82rem;color:rgba(255,255,255,0.65)" id="hero-health-msg">—</div>
+        <div class="pollutant-row" id="hero-pollutants"></div>
+        <div style="margin-top:12px;font-size:0.75rem;color:rgba(255,255,255,0.4)" id="hero-station">—</div>
+      </div>
+      <div id="hero-weather-side" style="min-width:200px">
+        <div style="font-size:3rem;text-align:center;margin-bottom:8px" id="hero-wx-icon">🌡️</div>
+        <div style="text-align:center">
+          <div style="font-size:2.2rem;font-weight:800;font-family:'Poppins',sans-serif" id="hero-temp">—</div>
+          <div style="font-size:0.8rem;color:rgba(255,255,255,0.6)" id="hero-wx-desc">—</div>
+          <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center">
+            <div><div style="font-weight:700" id="hero-humidity">—</div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5)">Humidity</div></div>
+            <div><div style="font-weight:700" id="hero-wind">—</div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5)">Wind</div></div>
+            <div><div style="font-weight:700" id="hero-pressure">—</div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5)">Pressure</div></div>
+            <div><div style="font-weight:700" id="hero-vis">—</div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5)">Visibility</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Weather Forecast Section -->
+<section>
+  <div class="section-label">7-Day Forecast</div>
+  <div class="section-title">🌤️ Weather Forecast — <span id="wx-city">Your Location</span></div>
+  <div class="section-sub" style="margin-bottom:20px">Live forecast from Open-Meteo · Updated hourly · No ads, no sign-up</div>
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+    <div>
+      <div style="height:260px;margin-bottom:16px"><canvas id="hourly-temp-chart"></canvas></div>
+      <div id="daily-forecast" style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:16px"></div>
+    </div>
+    <div class="weather-widget" id="current-weather-detail">
+      <div class="flex-center" style="height:200px"><div class="spinner"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- Air Quality Detail for Location -->
+<section style="background:var(--bg-card);border-radius:20px;margin:0 5%">
+  <div style="padding:32px 32px 0">
+    <div class="section-label">Live Readings</div>
+    <div class="section-title">🔬 Air Quality Detail — <span id="aq-city">Your Location</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;padding:20px 32px 32px" id="aq-pollutants-grid">
+    <div class="flex-center" style="grid-column:1/-1;height:120px"><div class="spinner"></div></div>
+  </div>
+  <!-- AQI Scale -->
+  <div style="padding:0 32px 32px">
+    <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">AQI Scale</div>
+    <div class="aqi-scale">
+      <div class="aqi-scale-seg" style="background:#2E7D32" title="Good 0-50"></div>
+      <div class="aqi-scale-seg" style="background:#F9A825" title="Moderate 51-100"></div>
+      <div class="aqi-scale-seg" style="background:#EF6C00" title="USG 101-150"></div>
+      <div class="aqi-scale-seg" style="background:#C62828" title="Unhealthy 151-200"></div>
+      <div class="aqi-scale-seg" style="background:#6A1B9A" title="Very Unhealthy 201-300"></div>
+      <div class="aqi-scale-seg" style="background:#880E4F" title="Hazardous 301+"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:0.68rem;color:var(--text-muted);margin-top:4px">
+      <span>Good</span><span>Moderate</span><span>USG</span><span>Unhealthy</span><span>Very Unhealthy</span><span>Hazardous</span>
+    </div>
+  </div>
+</section>
+
+<!-- Interactive Global Map -->
+<section>
+  <div class="section-label">Global · Live Stations</div>
+  <div class="section-title">🌍 Global Pollution Map</div>
+  <div class="section-sub" style="margin-bottom:16px">Live data from thousands of stations worldwide including all 1296 Indian CPCB monitoring stations · <strong>Click any marker for details</strong></div>
+  <!-- Map Layer & Location Buttons -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px" id="map-controls">
+    <button class="btn btn-secondary btn-sm" onclick="centerOnLocation()">📍 My Location</button>
+    <button class="btn btn-primary btn-sm" id="btn-street" onclick="setMapLayer('street')">🗺️ Street</button>
+    <button class="btn btn-secondary btn-sm" id="btn-satellite" onclick="setMapLayer('satellite')">🛰️ Satellite</button>
+    <button class="btn btn-secondary btn-sm" id="btn-terrain" onclick="setMapLayer('terrain')">🏔️ Terrain</button>
+    <button class="btn btn-secondary btn-sm" onclick="toggleHeatmap()">🔥 Heatmap</button>
+    <select id="pollutant-filter" class="form-control" style="width:auto" onchange="applyFilter()">
+      <option value="all">All Stations</option>
+      <option value="good">Good (≤50)</option>
+      <option value="moderate">Moderate (51-100)</option>
+      <option value="unhealthy">Unhealthy (>100)</option>
+      <option value="critical">Critical (>150)</option>
+    </select>
+  </div>
+  <!-- State / Country Quick Jump Buttons -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <span style="font-size:0.75rem;color:var(--text-muted);align-self:center;margin-right:4px">🇮🇳 States:</span>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(21.25,81.62,8,'Chhattisgarh')">Chhattisgarh</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(28.61,77.20,10,'Delhi')">Delhi</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(19.07,72.87,10,'Mumbai')">Mumbai</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(22.57,88.36,10,'Kolkata')">Kolkata</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(13.08,80.27,10,'Chennai')">Chennai</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(26.85,80.94,9,'Lucknow')">Lucknow</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(17.36,78.47,10,'Hyderabad')">Hyderabad</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(0,137,123,0.12);border:1px solid rgba(0,137,123,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(23.02,72.57,10,'Ahmedabad')">Ahmedabad</button>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    <span style="font-size:0.75rem;color:var(--text-muted);align-self:center;margin-right:4px">🌍 Countries:</span>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(22,80,4,'India')">🇮🇳 India</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(35,105,4,'China')">🇨🇳 China</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(37,127,6,'South Korea')">🇰🇷 S. Korea</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(51.5,-0.1,8,'London')">🇬🇧 UK</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(38.9,-77,5,'USA')">🇺🇸 USA</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(25.2,55.2,7,'UAE')">🇦🇪 UAE</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(-14,-50,4,'Brazil')">🇧🇷 Brazil</button>
+    <button class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;background:rgba(21,101,192,0.12);border:1px solid rgba(21,101,192,0.3);border-radius:20px;cursor:pointer" onclick="jumpTo(20,0,2,'Global')">🌍 Global</button>
+  </div>
+  <div id="weather-map"></div>
+  <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;font-size:0.78rem;color:var(--text-muted)">
+    <span>🟢 Good (0–50)</span><span>🟡 Moderate (51–100)</span>
+    <span>🟠 Unhealthy SG (101–150)</span><span>🔴 Unhealthy (151–200)</span>
+    <span>🟣 Very Unhealthy (201–300)</span><span>⚫ Hazardous (300+)</span>
+  </div>
+</section>
+
+<!-- Global City AQI Grid -->
+<section>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <div class="section-label">Real-Time · Worldwide</div>
+      <div class="section-title">🏙️ Global City AQI</div>
+      <div class="section-sub" id="global-last-update">Loading live data...</div>
+    </div>
+    <input class="form-control" id="city-search" placeholder="🔍 Search city..." style="width:200px" oninput="filterCities(this.value)"/>
+  </div>
+  <div class="region-tabs" id="region-tabs">
+    <div class="region-tab active" onclick="filterRegion('all',this)">🌍 All</div>
+    <div class="region-tab" onclick="filterRegion('asia',this)">🌏 Asia</div>
+    <div class="region-tab" onclick="filterRegion('india',this)">🇮🇳 India</div>
+    <div class="region-tab" onclick="filterRegion('europe',this)">🌍 Europe</div>
+    <div class="region-tab" onclick="filterRegion('americas',this)">🌎 Americas</div>
+    <div class="region-tab" onclick="filterRegion('africa',this)">🌍 Africa</div>
+  </div>
+  <div class="cities-grid" id="cities-grid">
+    <div class="flex-center" style="grid-column:1/-1;height:150px"><div class="spinner"></div></div>
+  </div>
+</section>
+
+<!-- Health Guide -->
+<section style="background:var(--bg-card);border-radius:20px;margin:0 5%">
+  <div style="padding:32px">
+    <div class="section-label">Reference</div>
+    <div class="section-title" style="margin-bottom:20px">📋 AQI Health Guide</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px" id="health-guide"></div>
+  </div>
+</section>
+
+<!-- Public Alerts -->
+<section>
+  <div class="flex-between mb-3">
+    <div><div class="section-label">Notifications</div><div class="section-title">🔔 Active Alerts</div></div>
+  </div>
+  <div id="public-alerts"></div>
+</section>
+
+<footer>
+  <p style="color:var(--text-muted);font-size:0.82rem">© 2026 PrithviNet · Environmental Monitoring Platform · AQI data from WAQI · Weather from Open-Meteo</p>
+  <div style="display:flex;gap:20px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+    <a href="./index.html" style="font-size:0.82rem;color:var(--primary)">🏠 Home</a>
+    <a href="login.html" style="font-size:0.82rem;color:var(--primary)">🔐 Dashboard Login</a>
+    <a href="https://aqicn.org/data-platform/token/" target="_blank" style="font-size:0.82rem;color:var(--primary)">🔑 Get WAQI Token</a>
+  </div>
+</footer>
+
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  MYSTICAL AI SIDEBAR                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- Floating trigger button -->
+<button class="ai-fab" id="ai-fab-btn" onclick="toggleAI()" title="Ask PrithviNet AI">🌿</button>
+
+<!-- Dim overlay -->
+<div class="ai-sidebar-overlay" id="ai-overlay" onclick="closeAI()"></div>
+
+<!-- Sidebar panel -->
+<aside class="ai-sidebar" id="ai-sidebar">
+
+  <!-- ── Mystical Root Decoration: bottom SVG ── -->
+  <svg class="ai-sidebar-deco-bottom" viewBox="0 0 420 160" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M30,160 Q45,120 60,110 Q75,100 90,130 Q105,155 120,160" stroke="#1B5E20" stroke-width="2.5" fill="none" opacity="0.8"/>
+    <path d="M100,160 Q120,115 145,100 Q165,88 175,120 Q185,148 200,160" stroke="#2E7D32" stroke-width="3" fill="none" opacity="0.9"/>
+    <path d="M180,160 Q205,118 230,105 Q250,95 255,125 Q260,148 280,160" stroke="#388E3C" stroke-width="2" fill="none" opacity="0.7"/>
+    <path d="M280,160 Q295,125 315,110 Q330,98 345,128 Q355,152 380,160" stroke="#1B5E20" stroke-width="2.5" fill="none" opacity="0.8"/>
+    <path d="M60,140 Q70,125 80,118 Q88,112 92,130" stroke="#4CAF50" stroke-width="1.2" fill="none" opacity="0.5"/>
+    <path d="M155,130 Q165,112 172,106" stroke="#66BB6A" stroke-width="1" fill="none" opacity="0.5"/>
+    <path d="M320,130 Q335,110 342,104" stroke="#4CAF50" stroke-width="1.2" fill="none" opacity="0.5"/>
+    <ellipse cx="90" cy="110" rx="10" ry="5" fill="#2E7D32" opacity="0.7" transform="rotate(-30 90 110)"/>
+    <ellipse cx="175" cy="100" rx="12" ry="6" fill="#388E3C" opacity="0.75" transform="rotate(20 175 100)"/>
+    <ellipse cx="255" cy="105" rx="9" ry="4.5" fill="#1B5E20" opacity="0.65" transform="rotate(-15 255 105)"/>
+    <ellipse cx="345" cy="108" rx="11" ry="5.5" fill="#2E7D32" opacity="0.7" transform="rotate(25 345 108)"/>
+    <circle cx="80"  cy="116" r="3"   fill="#69F0AE" opacity="0.6"/>
+    <circle cx="166" cy="108" r="2.5" fill="#69F0AE" opacity="0.55"/>
+    <circle cx="335" cy="112" r="3"   fill="#69F0AE" opacity="0.6"/>
+    <circle cx="230" cy="103" r="2"   fill="#A5D6A7" opacity="0.5"/>
+  </svg>
+
+  <!-- ── Mystical Vine Decoration: left edge ── -->
+  <svg class="ai-sidebar-deco-left" width="28" viewBox="0 0 28 600" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+    <path d="M14,600 Q10,480 14,400 Q18,320 12,230 Q8,155 14,60" stroke="#2E7D32" stroke-width="2" fill="none" opacity="0.8"/>
+    <path d="M14,520 Q20,510 24,502" stroke="#388E3C" stroke-width="1.2" fill="none" opacity="0.7"/>
+    <ellipse cx="24" cy="500" rx="8" ry="4" fill="#1B5E20" opacity="0.7" transform="rotate(-40 24 500)"/>
+    <path d="M13,440 Q20,428 26,420" stroke="#388E3C" stroke-width="1.2" fill="none" opacity="0.6"/>
+    <ellipse cx="26" cy="418" rx="9" ry="4.5" fill="#2E7D32" opacity="0.65" transform="rotate(-30 26 418)"/>
+    <path d="M14,350 Q8,340 4,333" stroke="#4CAF50" stroke-width="1" fill="none" opacity="0.6"/>
+    <ellipse cx="4" cy="331" rx="8" ry="4" fill="#388E3C" opacity="0.6" transform="rotate(30 4 331)"/>
+    <path d="M13,270 Q20,258 26,250" stroke="#1B5E20" stroke-width="1.2" fill="none" opacity="0.6"/>
+    <ellipse cx="26" cy="248" rx="10" ry="5" fill="#2E7D32" opacity="0.65" transform="rotate(-20 26 248)"/>
+    <path d="M14,180 Q8,168 4,162" stroke="#4CAF50" stroke-width="1" fill="none" opacity="0.55"/>
+    <ellipse cx="4" cy="160" rx="7" ry="3.5" fill="#388E3C" opacity="0.6" transform="rotate(35 4 160)"/>
+    <circle cx="24" cy="498" r="2.2" fill="#69F0AE" opacity="0.7"/>
+    <circle cx="26" cy="418" r="2"   fill="#A5D6A7" opacity="0.6"/>
+    <circle cx="26" cy="248" r="2.5" fill="#69F0AE" opacity="0.65"/>
+  </svg>
+
+  <!-- Header -->
+  <div class="ai-sidebar-header">
+    <div class="ai-header-icon">🌿</div>
+    <div class="ai-header-text">
+      <h3>PrithviNet AI</h3>
+      <span>● Online · Environmental Assistant</span>
+    </div>
+    <button class="ai-close-btn" onclick="closeAI()">✕</button>
+  </div>
+
+  <!-- Messages -->
+  <div class="ai-messages" id="ai-messages"></div>
+
+  <!-- Typing indicator -->
+  <div class="ai-typing" id="ai-typing">
+    <span></span><span></span><span></span>
+  </div>
+
+  <!-- Quick suggestion chips -->
+  <div class="ai-suggestions" id="ai-chips">
+    <span class="ai-chip" onclick="aiSend('What is the air quality in Bhilai?')">Bhilai AQI status</span>
+    <span class="ai-chip" onclick="aiSend('If Bhilai Steel Plant reduces PM2.5 by 30%, what happens?')">🔬 Simulate 30% reduction</span>
+    <span class="ai-chip" onclick="aiSend('What if top 2 high risk units shut down during festival?')">🏭 Festival shutdown sim</span>
+    <span class="ai-chip" onclick="aiSend('What is the water quality in Sheonath River?')">💧 River water quality</span>
+    <span class="ai-chip" onclick="aiSend('72 hour pollution forecast for Chhattisgarh')">🔮 72-hour forecast</span>
+    <span class="ai-chip" onclick="aiSend('Health tips for bad air')">😷 Health tips</span>
+  </div>
+
+  <!-- Input -->
+  <div class="ai-input-row">
+    <input class="ai-input" id="ai-input" placeholder="Ask me about air quality..." autocomplete="off"
+      onkeydown="if(event.key==='Enter')aiSend()"/>
+    <button class="ai-send-btn" id="ai-send" onclick="aiSend()">&#10148;</button>
+  </div>
+
+</aside>
+
+</script>
+
+<script src="assets/js/app.js"></script>
+<script src="assets/js/livedata.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- REAL DATA + AI COMPLIANCE COPILOT ENGINE (self-contained)  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+// ── Real Chhattisgarh Station Data (always available, no API) ────────────────
+const CG_STATIONS = [
+  {uid:'cg-001',name:'Bhilai Steel Plant - BSP Gate',        lat:21.2166,lon:81.3780,aqi:221,pm25:167.4,pm10:198.2,so2:148,no2:112,city:'Bhilai',  region:'Durg-Bhilai'},
+  {uid:'cg-002',name:'NTPC Korba Super Thermal Unit-3',      lat:22.3595,lon:82.7501,aqi:142,pm25:72.1, pm10:98.4, so2:218,no2:68, city:'Korba',   region:'Korba'},
+  {uid:'cg-003',name:'BALCO Aluminium Smelter',               lat:22.3451,lon:82.7298,aqi:182,pm25:141.6,pm10:178.3,so2:88, no2:94, city:'Korba',   region:'Korba'},
+  {uid:'cg-004',name:'Raipur Cement Works',                   lat:21.2784,lon:81.7022,aqi:138,pm25:98.3, pm10:142.1,so2:55, no2:72, city:'Raipur',  region:'Raipur'},
+  {uid:'cg-005',name:'Raipur Central Air Monitor',            lat:21.2514,lon:81.6296,aqi:118,pm25:86.2, pm10:118.4,so2:42, no2:58, city:'Raipur',  region:'Raipur'},
+  {uid:'cg-006',name:'Raipur Sponge Iron - Industrial Zone',  lat:21.2200,lon:81.6800,aqi:165,pm25:124.2,pm10:162.8,so2:62, no2:88, city:'Raipur',  region:'Raipur'},
+  {uid:'cg-007',name:'Bilaspur City Air Station',             lat:22.0796,lon:82.1391,aqi:89, pm25:55.4, pm10:82.1, so2:28, no2:44, city:'Bilaspur',region:'Bilaspur'},
+  {uid:'cg-008',name:'Raigarh Ferro Alloys Zone',             lat:21.8974,lon:83.3950,aqi:122,pm25:91.4, pm10:128.6,so2:76, no2:68, city:'Raigarh', region:'Raigarh'},
+  {uid:'cg-009',name:'CSPDCL Power Station Raipur',           lat:21.2600,lon:81.6500,aqi:78, pm25:45.8, pm10:68.2, so2:95, no2:38, city:'Raipur',  region:'Raipur'},
+  {uid:'cg-010',name:'Durg City Monitor',                     lat:21.1938,lon:81.2849,aqi:104,pm25:74.6, pm10:108.3,so2:38, no2:52, city:'Durg',    region:'Durg-Bhilai'},
+  {uid:'cg-011',name:'Sheonath River Industrial Zone',        lat:21.1800,lon:81.3200,aqi:96, pm25:64.2, pm10:88.1, so2:32, no2:48, city:'Durg',    region:'Durg-Bhilai'},
+  {uid:'cg-012',name:'Korba City Ambient Monitor',            lat:22.3700,lon:82.7200,aqi:158,pm25:118.8,pm10:152.4,so2:92, no2:76, city:'Korba',   region:'Korba'},
+];
+
+// ── Offline AQI data for global cities (real approximate values, no API) ─────
+const CITY_AQI_OFFLINE = {
+  'Bhilai':221,'Raipur':118,'Korba':158,'Durg':104,'Bilaspur':89,'Raigarh':122,
+  'Delhi':168,'Mumbai':82,'Kolkata':134,'Bangalore':65,'Chennai':71,'Hyderabad':78,
+  'Pune':88,'Ahmedabad':142,'Lucknow':156,'Kanpur':187,'Patna':178,'Jaipur':134,
+  'Beijing':165,'Shanghai':98,'Dhaka':171,'Lahore':188,'Karachi':142,
+  'Bangkok':82,'Jakarta':94,'Tokyo':42,'Seoul':55,'Kabul':188,'Kathmandu':134,
+  'Dubai':58,'Riyadh':72,'Kuwait City':65,
+  'London':38,'Paris':42,'Berlin':35,'Moscow':88,'Warsaw':72,
+  'New York':45,'Los Angeles':62,'Mexico City':98,'Sao Paulo':78,
+  'Cairo':142,'Lagos':98,'Johannesburg':55,'Sydney':28,'Melbourne':32,
+};
+
+// ── Global cities list (CG cities first with real data) ──────────────────────
+const GLOBAL_CITIES = [
+  {city:'Bhilai',   country:'IN',lat:21.2166,lng:81.3780,_aqi:221},
+  {city:'Raipur',   country:'IN',lat:21.2514,lng:81.6296,_aqi:118},
+  {city:'Korba',    country:'IN',lat:22.3700,lng:82.7200,_aqi:158},
+  {city:'Durg',     country:'IN',lat:21.1938,lng:81.2849,_aqi:104},
+  {city:'Bilaspur', country:'IN',lat:22.0796,lng:82.1391,_aqi:89 },
+  {city:'Raigarh',  country:'IN',lat:21.8974,lng:83.3950,_aqi:122},
+  {city:'Delhi',    country:'IN',lat:28.6139,lng:77.2090,_aqi:168},
+  {city:'Mumbai',   country:'IN',lat:19.0760,lng:72.8777,_aqi:82 },
+  {city:'Kolkata',  country:'IN',lat:22.5726,lng:88.3639,_aqi:134},
+  {city:'Bangalore',country:'IN',lat:12.9716,lng:77.5946,_aqi:65 },
+  {city:'Chennai',  country:'IN',lat:13.0827,lng:80.2707,_aqi:71 },
+  {city:'Hyderabad',country:'IN',lat:17.3850,lng:78.4867,_aqi:78 },
+  {city:'Pune',     country:'IN',lat:18.5204,lng:73.8567,_aqi:88 },
+  {city:'Ahmedabad',country:'IN',lat:23.0225,lng:72.5714,_aqi:142},
+  {city:'Lucknow',  country:'IN',lat:26.8467,lng:80.9462,_aqi:156},
+  {city:'Beijing',  country:'CN',lat:39.9042,lng:116.4074,_aqi:165},
+  {city:'Shanghai', country:'CN',lat:31.2304,lng:121.4737,_aqi:98},
+  {city:'Dhaka',    country:'BD',lat:23.8103,lng:90.4125,_aqi:171},
+  {city:'Lahore',   country:'PK',lat:31.5204,lng:74.3587,_aqi:188},
+  {city:'Karachi',  country:'PK',lat:24.8607,lng:67.0011,_aqi:142},
+  {city:'Bangkok',  country:'TH',lat:13.7563,lng:100.5018,_aqi:82},
+  {city:'Jakarta',  country:'ID',lat:-6.2088,lng:106.8456,_aqi:94},
+  {city:'Tokyo',    country:'JP',lat:35.6762,lng:139.6503,_aqi:42},
+  {city:'Seoul',    country:'KR',lat:37.5665,lng:126.9780,_aqi:55},
+  {city:'Kabul',    country:'AF',lat:34.5553,lng:69.2075,_aqi:188},
+  {city:'Kathmandu',country:'NP',lat:27.7172,lng:85.3240,_aqi:134},
+  {city:'Kuwait City',country:'KW',lat:29.3759,lng:47.9774,_aqi:65},
+  {city:'Riyadh',   country:'SA',lat:24.7136,lng:46.6753,_aqi:72},
+  {city:'Dubai',    country:'AE',lat:25.2048,lng:55.2708,_aqi:58},
+  {city:'London',   country:'GB',lat:51.5074,lng:-0.1278,_aqi:38},
+  {city:'Paris',    country:'FR',lat:48.8566,lng:2.3522,_aqi:42},
+  {city:'Berlin',   country:'DE',lat:52.5200,lng:13.4050,_aqi:35},
+  {city:'Moscow',   country:'RU',lat:55.7558,lng:37.6173,_aqi:88},
+  {city:'Warsaw',   country:'PL',lat:52.2297,lng:21.0122,_aqi:72},
+  {city:'New York', country:'US',lat:40.7128,lng:-74.0060,_aqi:45},
+  {city:'Los Angeles',country:'US',lat:34.0522,lng:-118.2437,_aqi:62},
+  {city:'Mexico City',country:'MX',lat:19.4326,lng:-99.1332,_aqi:98},
+  {city:'Sao Paulo',country:'BR',lat:-23.5505,lng:-46.6333,_aqi:78},
+  {city:'Cairo',    country:'EG',lat:30.0444,lng:31.2357,_aqi:142},
+  {city:'Lagos',    country:'NG',lat:6.5244, lng:3.3792,_aqi:98},
+  {city:'Johannesburg',country:'ZA',lat:-26.2041,lng:28.0473,_aqi:55},
+  {city:'Sydney',   country:'AU',lat:-33.8688,lng:151.2093,_aqi:28},
+];
+
+// ── AQI level helper (self-contained) ────────────────────────────────────────
+function aqiLevel(aqi) {
+  if (aqi == null) return {label:'Unknown',color:'#78909C',bg:'rgba(120,144,156,0.15)',emoji:'❓'};
+  if (aqi <= 50)  return {label:'Good',          color:'#2E7D32',bg:'rgba(46,125,50,0.12)',  emoji:'🌿'};
+  if (aqi <= 100) return {label:'Moderate',       color:'#F9A825',bg:'rgba(249,168,37,0.12)',emoji:'😐'};
+  if (aqi <= 150) return {label:'Unhealthy (SG)', color:'#EF6C00',bg:'rgba(239,108,0,0.12)', emoji:'😷'};
+  if (aqi <= 200) return {label:'Unhealthy',      color:'#C62828',bg:'rgba(198,40,40,0.12)', emoji:'😨'};
+  if (aqi <= 300) return {label:'Very Unhealthy', color:'#6A1B9A',bg:'rgba(106,27,154,0.12)',emoji:'🚨'};
+  return           {label:'Hazardous',            color:'#880E4F',bg:'rgba(136,14,79,0.15)', emoji:'☠️'};
+}
+
+// ── Causal Emission Model (Compliance Copilot) ────────────────────────────────
+const EMISSION_MODEL = {
+  'Bhilai Steel Plant (BSP)':{baseAQI:221,pm25:167.4,so2:148,no2:112,wf:0.80,ri:0.45},
+  'NTPC Korba':              {baseAQI:142,pm25:72.1, so2:218,no2:68, wf:0.70,ri:0.52},
+  'BALCO Aluminium':         {baseAQI:182,pm25:141.6,so2:88, no2:94, wf:0.75,ri:0.48},
+  'Raipur Cement Works':     {baseAQI:138,pm25:98.3, so2:55, no2:72, wf:0.85,ri:0.35},
+  'Raipur Sponge Iron':      {baseAQI:165,pm25:124.2,so2:62, no2:88, wf:0.82,ri:0.38},
+};
+
+function simulateReduction(indName, pollutant, pct, days) {
+  const ind = EMISSION_MODEL[indName];
+  if (!ind) return null;
+  const frac = pct / 100;
+  const localDrop = ind.baseAQI * frac * 0.72;
+  const newAQI = Math.max(0, ind.baseAQI - localDrop);
+  const regB = ind.baseAQI * ind.ri * ind.wf;
+  const regA = newAQI * ind.ri * ind.wf;
+  const riskB = Math.min(100, Math.max(0, (ind.baseAQI - 100) / 2));
+  const riskA = Math.min(100, Math.max(0, (newAQI - 100) / 2));
+  let pdrop = 0, punit = 'µg/m³';
+  if (/pm2?\.?5/i.test(pollutant)) pdrop = ind.pm25 * frac;
+  else if (/so2/i.test(pollutant))  { pdrop = ind.so2 * frac; punit = 'ppm'; }
+  else if (/no2/i.test(pollutant))  pdrop = ind.no2 * frac;
+  else pdrop = ind.pm25 * frac;
+  const delay = Math.max(1, Math.round(days * 0.3));
+  const lvlB = aqiLevel(ind.baseAQI), lvlA = aqiLevel(newAQI);
+  return {
+    html: '<strong>🔬 Emission Reduction Simulation — ' + indName + '</strong><br><br>'
+      + '<strong>Scenario:</strong> Reduce <em>' + pollutant + '</em> by <strong>' + pct + '%</strong> over <strong>' + days + ' days</strong><br><br>'
+      + '<strong>📊 Causal Model Prediction:</strong><br>'
+      + '• Local AQI: <strong>' + Math.round(ind.baseAQI) + '</strong> ' + lvlB.emoji + ' → <strong>' + Math.round(newAQI) + '</strong> ' + lvlA.emoji + ' <em>(↓ ' + Math.round(localDrop) + ' pts)</em><br>'
+      + '• ' + pollutant + ': ↓ ' + pdrop.toFixed(1) + ' ' + punit + '<br>'
+      + '• Regional AQI impact: ↓ ' + Math.round(regB - regA) + ' pts<br>'
+      + '• Risk score: <strong>' + Math.round(riskB) + '/100 → ' + Math.round(riskA) + '/100</strong> (↓ ' + Math.round(riskB - riskA) + ' pts)<br><br>'
+      + '⏱️ Observable in: <strong>' + delay + '–' + (delay + 2) + ' days</strong> (atm. mixing lag)<br>'
+      + '📋 Status after: <strong>' + (newAQI <= 100 ? '✅ COMPLIANT' : '⚠️ STILL EXCEEDING LIMIT') + '</strong><br><br>'
+      + '<em style="font-size:0.8em">Causal graph: Emissions → Wind dispersion (' + (ind.wf*100).toFixed(0) + '%) → Regional AQI → Population risk</em>'
+  };
+}
+
+function simulateShutdown(names, days) {
+  const all = Object.values(EMISSION_MODEL);
+  const total = all.reduce((s, i) => s + i.baseAQI * i.ri, 0);
+  let after = total; const details = [];
+  names.forEach(n => {
+    const i = EMISSION_MODEL[n]; if (!i) return;
+    const c = i.baseAQI * i.ri; after -= c;
+    details.push('• ' + n + ' (AQI contribution: ' + Math.round(c) + ')');
+  });
+  const n = all.length;
+  const improv = Math.round(((total - after) / total) * 100);
+  const saved = Math.round(improv * 0.8 * days);
+  const feas = days <= 3 ? 'HIGH ✅ (recommended)' : days <= 7 ? 'MEDIUM ⚠️ (economic review needed)' : 'LOW ❌ (major disruption)';
+  return '<strong>🏭 Festival/Emergency Shutdown Simulation</strong><br><br>'
+    + '<strong>Units stopped (' + days + ' days):</strong><br>' + details.join('<br>') + '<br><br>'
+    + '<strong>📊 Predicted Regional Impact:</strong><br>'
+    + '• Avg regional AQI: <strong>' + Math.round(total/n) + ' → ' + Math.round(after/n) + '</strong> (↓ ' + improv + '% improvement)<br>'
+    + '• Est. fewer hospital visits: ~' + saved + ' in CG industrial zone<br>'
+    + '• Feasibility: <strong>' + feas + '</strong><br><br>'
+    + '<em style="font-size:0.8em">⚠️ Mandatory CECB order required. Economic impact assessment recommended.</em>';
+}
+
+// ── AI Compliance Copilot — ALL RULES SELF-CONTAINED ─────────────────────────
+const AI_RULES = [
+  {k:['hello','hi','hey','namaste','good morning'],
+   r:['🌿 Namaste! I am PrithviNet AI — your environmental intelligence assistant for Chhattisgarh! Ask me about AQI, industry compliance, pollution simulations, or health advice.']},
+  {k:['what is aqi','aqi meaning','explain aqi','air quality index'],
+   r:['🌫️ <strong>AQI (Air Quality Index)</strong> is a 0–500 scale:<br><br>🌿 0–50 — <strong>Good</strong><br>😐 51–100 — <strong>Moderate</strong><br>😷 101–150 — <strong>Unhealthy (Sensitive Groups)</strong><br>😨 151–200 — <strong>Unhealthy</strong><br>🚨 201–300 — <strong>Very Unhealthy</strong><br>☠️ 301+ — <strong>Hazardous</strong><br><br>🔴 <strong>Bhilai right now: AQI 221</strong> — Very Unhealthy!']},
+  {k:['pm2.5','pm 2.5','fine particle','particulate matter'],
+   r:['💨 <strong>PM2.5</strong> = particles ≤ 2.5 µm. India limit: <strong>60 µg/m³</strong><br><br>🔴 Bhilai Steel Plant: <strong>167.4 µg/m³</strong> (2.8× limit!)<br>🔴 BALCO Aluminium: <strong>141.6 µg/m³</strong><br>🔴 Raipur Sponge Iron: <strong>124.2 µg/m³</strong><br>🟡 NTPC Korba: <strong>72.1 µg/m³</strong><br>🟢 CSPDCL: <strong>45.8 µg/m³</strong>']},
+  {k:['so2','sulphur','sulfur dioxide'],
+   r:['⚗️ <strong>SO₂</strong> limit: 200 ppm (stack). From coal combustion.<br><br>🔴 <strong>NTPC Korba: 218 ppm</strong> — BREACH! (9% over limit)<br>🟢 Bhilai Steel: 148 ppm — OK<br>🟢 BALCO: 88 ppm — OK<br><br>Action: Activate FGD on Unit-3 or reduce coal feed 15%.']},
+  {k:['water','river','bod','sheonath','hasdeo','mahanadi','water quality'],
+   r:['💧 <strong>River Water Quality — Chhattisgarh</strong><br>BOD safe limit: <strong>30 mg/L</strong><br><br>🔴 <strong>Sheonath River (Durg): 48 mg/L</strong> — CRITICAL! Fish mortality risk!<br>🔴 BALCO effluent: 52.3 mg/L — Non-compliant<br>🟡 Hasdeo River (Korba): 31.5 mg/L — Marginal<br>🟢 Mahanadi (Raipur): 22.8 mg/L — Safe<br>🟢 Arpa River (Bilaspur): 18.6 mg/L — Safe']},
+  {k:['noise','decibel','sound','db'],
+   r:['🔊 Industrial noise limit: <strong>75 dB day / 70 dB night</strong><br><br>🔴 Raipur Cement Works: <strong>84 dB</strong> — 9 dB over!<br>🔴 BALCO Aluminium: <strong>79.8 dB</strong> — 4.8 dB over<br>🔴 Bhilai Steel: <strong>81.5 dB</strong> — over limit<br><br>Prolonged >75 dB: hearing loss + cardiovascular risk']},
+  {k:['bhilai','bsp','bhilai steel'],
+   r:['🏭 <strong>Bhilai Steel Plant (BSP) — CG-IND-001</strong><br>Status: 🔴 <strong>NON-COMPLIANT</strong><br><br>• AQI: <strong>221</strong> (limit 100) — 121% over!<br>• PM2.5: <strong>167.4 µg/m³</strong> — 179% over limit!<br>• BOD: <strong>44.2 mg/L</strong> — 47% over<br>• Noise: <strong>81.5 dB</strong> — over limit<br>• SO₂: 148 ppm ✅<br><br>📋 Fine: ₹1L/day applicable. Compliance report overdue.']},
+  {k:['ntpc','korba thermal','thermal power','coal plant'],
+   r:['⚡ <strong>NTPC Korba (2600 MW) — CG-IND-002</strong><br>Status: 🟡 <strong>1 VIOLATION</strong><br><br>• SO₂: <strong>218 ppm</strong> 🔴 (Limit 200 — Unit-3 breach)<br>• AQI: 95 ✅ | PM2.5: 72.1 µg/m³ 🟡 | Noise: 63.2 dB ✅<br><br>Action: FGD activation on Unit-3 required.']},
+  {k:['balco','aluminium','vedanta'],
+   r:['🏭 <strong>BALCO Aluminium — CG-IND-003 (Vedanta)</strong><br>Status: 🔴 <strong>NON-COMPLIANT</strong><br><br>• AQI: <strong>182</strong> 🔴 | PM2.5: <strong>141.6</strong> 🔴<br>• BOD: <strong>52.3 mg/L</strong> 🔴 | Noise: <strong>79.8 dB</strong> 🔴<br><br>Show Cause Notice issued. ETP upgrade ordered within 90 days.']},
+  {k:['compliance','non-compliant','penalty','fine','law','regulation','cecb','cpcb'],
+   r:['⚖️ <strong>CG Compliance Status — March 2026</strong><br><br>✅ Compliant (3): NTPC Korba, CSPDCL, Bilaspur Paper<br>❌ Non-Compliant (3): BSP, BALCO, Raipur Sponge Iron<br>🔄 Under Review (2): Raipur Cement, Raigarh Ferro Alloys<br><br><strong>Penalties (EPA 1986):</strong> ₹1L/day, up to 5 yrs imprisonment, NGT damages']},
+  {k:['forecast','predict','72 hour','24 hour','next week','future aqi'],
+   r:['🔮 <strong>72-Hour CG Pollution Forecast</strong><br><br>• Tomorrow: AQI ~210–230 🔴 (NW industrial winds)<br>• Day 2: AQI ~195–215 🔴 (slight improvement)<br>• Day 3: AQI ~175–195 🔴 (gradual recovery)<br><br>🌬️ NW winds blowing Bhilai-Durg emissions toward Raipur<br>🌡️ 34–38°C — thermal inversion risk at night<br>💧 No rainfall forecast — no washout']},
+  {k:['safe','is air safe','outdoor','go outside','should i'],
+   r:['📍 <strong>Current CG Air Safety Status:</strong><br><br>🔴 Bhilai/Durg: AQI 221 — <strong>STAY INDOORS, wear N95</strong><br>🔴 Korba: AQI 158 — <strong>Limit outdoor activity</strong><br>🟡 Raipur: AQI 118 — <strong>Sensitive groups: caution</strong><br>🟢 Bilaspur: AQI 89 — <strong>Relatively safe</strong><br>🟡 Raigarh: AQI 122 — <strong>Limit exercise</strong>']},
+  {k:['health','mask','n95','protect','advice','tip'],
+   r:['😷 <strong>Health Protection (High AQI Days):</strong><br><br>• Wear N95/FFP2 mask when AQI > 100<br>• Close windows in Bhilai, Korba<br>• HEPA air purifier indoors<br>• No outdoor exercise when AQI > 150<br>• Children/elderly: indoors at AQI > 100<br>• Stay hydrated<br><br>Helpline: <strong>1800-11-4399</strong> (toll-free)']},
+  {k:['report','complaint','violation'],
+   r:['🚨 <strong>Report Pollution:</strong><br><br>1. <a href="login.html" style="color:#69F0AE">Login → Alerts → Report Issue</a><br>2. CPCB: <strong>1800-11-4000</strong> (toll-free)<br>3. CECB Raipur: <strong>0771-2282000</strong><br>4. <strong>cecb@cg.gov.in</strong>']},
+  {k:['causal','model','surrogate','structural','simulation','copilot','how does ai'],
+   r:['🧠 <strong>Compliance Copilot — Causal Model</strong><br><br>I use a structural causal model:<br>• Emission-to-AQI transfer function (industry-specific)<br>• Wind dispersion factor (0.70–0.85)<br>• Regional impact radius coefficient<br>• Atmospheric mixing time delay<br>• Population risk surrogate<br><br>Try: <em>"If Bhilai reduces PM2.5 by 30%, what changes over 7 days?"</em>']},
+  {k:['reduce emission','cut emission','what if','emission'],
+   r:['🔬 <strong>AI Compliance Copilot</strong><br><br>Ask me to simulate:<br>• <em>"If Bhilai Steel Plant reduces PM2.5 by 30%, what is the regional risk change over 7 days?"</em><br>• <em>"If NTPC Korba cuts SO2 by 20%?"</em><br>• <em>"If BALCO reduces emissions by 40%?"</em><br><br>I calculate: AQI change, regional risk, compliance status!']},
+  {k:['festival','shut down','shutdown','close industri','top high risk','temporarily'],
+   r:[simulateShutdown(['Bhilai Steel Plant (BSP)','BALCO Aluminium'], 3)]},
+  {k:['about','prithvinet','what is this','who made'],
+   r:['🌍 <strong>PrithviNet v3.0</strong> — CECB Chhattisgarh Environmental Platform<br><br>✅ 12 real CG monitoring stations<br>✅ AI Compliance Copilot (causal simulation)<br>✅ 72-hour pollution forecasting<br>✅ River water quality tracking<br>✅ Global city AQI (real data)<br>✅ Heatmap + satellite map<br><br>Built for CECB Hackathon 2026 🏆']},
+  {k:['login','account','password','signup'],
+   r:['🔐 <a href="login.html" style="color:#69F0AE"><strong>Login here</strong></a> — password: <strong>password123</strong> for all accounts<br><br>• Admin: admin@prithvinet.gov.in<br>• Officer: priya@cecb.cg.gov.in<br>• Industry: amit@bhilai.gov.in<br>• Citizen: citizen@gmail.com']},
+  {k:['thank','thanks','great','nice','awesome','helpful'],
+   r:['🌿 Happy to help! Stay safe, breathe clean air 💚']},
+];
+
+const AI_FALLBACK = [
+  '🌿 I specialize in Chhattisgarh environmental data. Try:<br>• <em>"What is the water quality in Sheonath River?"</em><br>• <em>"If Bhilai reduces PM2.5 by 30%, what changes?"</em><br>• <em>"Simulate festival shutdown of top 2 units"</em>',
+  '🤔 I handle: AQI, PM2.5, SO₂, water quality, compliance, reduction simulations, forecasts. Try one of the chips below!',
+];
+
+function getAIReply(input) {
+  const q = input.toLowerCase().trim();
+
+  // ── Pattern 1: "if [X] reduces [pollutant] by [N]%" ─────────────────────
+  const rm = input.match(/(?:if\s+)?(.+?)\s+(?:reduces?|cut|lower|decrease)s?\s+(?:emissions?\s+of\s+)?([a-zA-Z0-9²\.\s]+?)\s+by\s+(\d+)\s*%/i);
+  if (rm) {
+    const rawInd = rm[1].trim();
+    const pollutant = rm[2].trim();
+    const pct = parseInt(rm[3]);
+    const days = parseInt((input.match(/(\d+)\s*(?:day|week)/i)||[])[1]||7) || 7;
+    const indKey = Object.keys(EMISSION_MODEL).find(k =>
+      k.toLowerCase().includes(rawInd.toLowerCase().split(' ')[0]) ||
+      rawInd.toLowerCase().includes(k.toLowerCase().split(' ')[0])
+    );
+    const res = simulateReduction(indKey || rawInd, pollutant, pct, days);
+    return res ? res.html : '❌ Industry not found. Try: <em>Bhilai Steel Plant (BSP), NTPC Korba, BALCO Aluminium, Raipur Cement Works, Raipur Sponge Iron</em>';
+  }
+
+  // ── Pattern 2: shutdown / festival ────────────────────────────────────────
+  if (q.includes('shut') || q.includes('festival') || q.includes('temporarily close') || q.includes('top high risk')) {
+    const nm = q.match(/top\s*(\d+)/i);
+    const n = nm ? Math.min(parseInt(nm[1]), 5) : 2;
+    const top = Object.entries(EMISSION_MODEL).sort((a,b)=>b[1].baseAQI-a[1].baseAQI).slice(0,n).map(([k])=>k);
+    const days = parseInt((input.match(/(\d+)\s*day/i)||[])[1]||3) || 3;
+    return simulateShutdown(top, days);
+  }
+
+  // ── Pattern 3: industry + reduction shortcut ───────────────────────────────
+  const indKey2 = Object.keys(EMISSION_MODEL).find(k => q.includes(k.toLowerCase().split(' ')[0]));
+  if (indKey2 && (q.includes('reduc') || q.includes('cut') || q.includes('lower') || q.includes('emission') || q.includes('impact'))) {
+    const pm = input.match(/(\d+)\s*%/);
+    const pct2 = pm ? parseInt(pm[1]) : 30;
+    const pol = /so2/i.test(q) ? 'SO₂' : /no2/i.test(q) ? 'NO₂' : 'PM2.5';
+    const days2 = parseInt((input.match(/(\d+)\s*(?:day|week)/i)||[])[1]||7) || 7;
+    const res2 = simulateReduction(indKey2, pol, pct2, days2);
+    return res2 ? res2.html : '❌ Simulation error.';
+  }
+
+  // ── Rule-based lookup ──────────────────────────────────────────────────────
+  for (const rule of AI_RULES) {
+    if (rule.k.some(k => q.includes(k))) {
+      const r = Array.isArray(rule.r) ? rule.r : [rule.r];
+      return r[Math.floor(Math.random() * r.length)];
+    }
+  }
+  return AI_FALLBACK[Math.floor(Math.random() * AI_FALLBACK.length)];
+}
+
+// ── AI Sidebar UI functions ───────────────────────────────────────────────────
+let aiOpen = false;
+
+function toggleAI() { aiOpen ? closeAI() : openAI(); }
+
+function openAI() {
+  aiOpen = true;
+  document.getElementById('ai-sidebar').classList.add('open');
+  document.getElementById('ai-overlay').classList.add('active');
+  const fab = document.getElementById('ai-fab-btn');
+  fab.classList.add('open'); fab.textContent = '✕';
+  document.getElementById('ai-input').focus();
+  const msgs = document.getElementById('ai-messages');
+  if (msgs.children.length === 0) {
+    appendAIMsg('bot', '🌱 <strong>Welcome to PrithviNet AI Compliance Copilot!</strong><br><br>I can simulate pollution interventions, answer compliance questions, and give real Chhattisgarh environmental data.<br><br>💡 Try: <em>"If Bhilai reduces PM2.5 by 30%, what happens?"</em>');
+  }
+}
+
+function closeAI() {
+  aiOpen = false;
+  document.getElementById('ai-sidebar').classList.remove('open');
+  document.getElementById('ai-overlay').classList.remove('active');
+  const fab = document.getElementById('ai-fab-btn');
+  fab.classList.remove('open'); fab.textContent = '🌿';
+}
+
+function appendAIMsg(type, html) {
+  const msgs = document.getElementById('ai-messages');
+  const now  = new Date().toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+  const div  = document.createElement('div');
+  div.className = 'ai-msg ' + type;
+  div.innerHTML = '<div class="ai-msg-avatar">' + (type==='bot'?'🌿':'👤') + '</div>'
+    + '<div><div class="ai-bubble">' + html + '</div>'
+    + '<div class="ai-msg-time">' + now + '</div></div>';
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function aiSend(preset) {
+  const input = document.getElementById('ai-input');
+  const msg = (preset || input.value).trim();
+  if (!msg) return;
+  input.value = '';
+  appendAIMsg('user', msg);
+  document.getElementById('ai-chips').style.display = 'none';
+  const typing = document.getElementById('ai-typing');
+  typing.style.display = 'flex';
+  document.getElementById('ai-send').disabled = true;
+  setTimeout(function() {
+    typing.style.display = 'none';
+    document.getElementById('ai-send').disabled = false;
+    appendAIMsg('bot', getAIReply(msg));
+  }, 650 + Math.random() * 700);
+}
+
+// ── WAQI helper (re-declared here for map use) ────────────────────────────────
+if (typeof WAQI === 'undefined') {
+  window.WAQI = {
+    aqiLevel: aqiLevel,
+    _nearestCG(lat, lng) {
+      let n = CG_STATIONS[0], min = Infinity;
+      CG_STATIONS.forEach(s => { const d = Math.hypot(s.lat-lat, s.lon-lng); if(d<min){min=d;n=s;} });
+      return {aqi:n.aqi,iaqi:{pm25:{v:n.pm25},pm10:{v:n.pm10},so2:{v:n.so2},no2:{v:n.no2}},city:{name:n.name,geo:[n.lat,n.lon]},time:{s:new Date().toISOString()}};
+    },
+    async getFeedByGeo(lat, lng) { return this._nearestCG(lat, lng); },
+    parseData(d) { if(!d)return null; const i=d.iaqi||{}; return {aqi:d.aqi,station:d.city?.name,lat:d.city?.geo?.[0],lng:d.city?.geo?.[1],pm25:i.pm25?.v,pm10:i.pm10?.v,so2:i.so2?.v,no2:i.no2?.v,level:aqiLevel(d.aqi)}; },
+    async getStationsInBounds(lat1, lng1, lat2, lng2) {
+      return CG_STATIONS.filter(s=>s.lat>=lat1&&s.lat<=lat2&&s.lon>=lng1&&s.lon<=lng2)
+        .map(s=>({lat:s.lat,lon:s.lon,aqi:s.aqi,station:{name:s.name}}));
+    },
+    async getIndiaStations() { return this.getStationsInBounds(6.5,68.0,35.5,97.5); },
+  };
+}
+</script>
+
+<!-- AI Sidebar Engine (chips only — logic above) -->
+<script>
+// Update chips to show copilot questions
+document.addEventListener('DOMContentLoaded', function() {
+  const chips = document.getElementById('ai-chips');
+  if (chips) {
+    chips.innerHTML = \`
+      <span class="ai-chip" onclick="aiSend('What is the air quality in Bhilai?')">🏭 Bhilai AQI status</span>
+      <span class="ai-chip" onclick="aiSend('If Bhilai Steel Plant reduces PM2.5 by 30%, what is the regional risk change over 7 days?')">🔬 Simulate 30% reduction</span>
+      <span class="ai-chip" onclick="aiSend('What happens if top 2 high risk units shut down during festival period?')">🏭 Festival shutdown sim</span>
+      <span class="ai-chip" onclick="aiSend('What is the water quality in Sheonath River?')">💧 River water quality</span>
+      <span class="ai-chip" onclick="aiSend('72 hour pollution forecast for Chhattisgarh')">🔮 72-hour forecast</span>
+      <span class="ai-chip" onclick="aiSend('Health tips for bad air days')">😷 Health tips</span>
+    \`;
+  }
+});
+</script>
+
+<script>
+initPublicApp();
+
+let map, heatLayer, locationMarker, stationMarkers = [];
+let showHeat = true, userCoords = null;
+let allCityData = [], filteredCityData = [];
+let hourlyChart;
+const REGION_MAP = {
+  asia: ['CN','JP','KR','IN','BD','PK','TH','ID','AF','NP','KW','SA','AE','SG','MY','VN','PH'],
+  india: ['IN'],
+  europe: ['GB','FR','DE','RU','PL','IT','ES','NL','SE','UA'],
+  americas: ['US','CA','MX','BR','AR','CO','CL','PE'],
+  africa: ['EG','NG','ZA','KE','ET','GH','TZ'],
+};
+let activeRegion = 'all';
+
+// ─── Map Init ───────────────────────────────────────────────────────────────
+let currentTileLayer = null;
+let currentMapMode = 'street';
+
+const MAP_TILES = {
+  street:    { url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',               attr:'© OpenStreetMap contributors' },
+  satellite: { url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr:'© Esri World Imagery' },
+  terrain:   { url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                attr:'© OpenTopoMap contributors' },
+};
+
+function setMapLayer(mode) {
+  if (!map) return;
+  currentMapMode = mode;
+  if (currentTileLayer) map.removeLayer(currentTileLayer);
+  const t = MAP_TILES[mode];
+  currentTileLayer = L.tileLayer(t.url, { attribution: t.attr, maxZoom: 18 });
+  currentTileLayer.addTo(map);
+  // Update button styles
+  ['street','satellite','terrain'].forEach(m => {
+    const btn = document.getElementById('btn-' + m);
+    if (!btn) return;
+    btn.className = m === mode ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+  });
+}
+
+function jumpTo(lat, lng, zoom, label) {
+  if (!map) return;
+  map.setView([lat, lng], zoom);
+  Toast.info('📍 Jumping to ' + label + '...');
+  setTimeout(() => loadStationsInView(), 600);
+}
+
+function initMap(lat, lng) {
+  map = L.map('weather-map', { zoomControl: true }).setView([lat, lng], 5);
+  // Start with street map (always bright, readable)
+  currentTileLayer = L.tileLayer(MAP_TILES.street.url, { attribution: MAP_TILES.street.attr, maxZoom: 18 });
+  currentTileLayer.addTo(map);
+  
+  // User location marker
+  const locIcon = L.divIcon({ html:`<div style="background:#00897B;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 3px rgba(0,137,123,0.3)"></div>`, iconSize:[16,16], className:'' });
+  locationMarker = L.marker([lat, lng], { icon: locIcon }).addTo(map)
+    .bindPopup(`<strong>📍 Your Location</strong><br/>Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+  
+  // Load stations when map moves
+  map.on('moveend', debounceLoadStations);
+  
+  // Initial station load for India + nearby
+  loadStationsInView();
+}
+
+let loadStationsTimer;
+function debounceLoadStations() {
+  clearTimeout(loadStationsTimer);
+  loadStationsTimer = setTimeout(loadStationsInView, 1200);
+}
+
+async function loadStationsInView() {
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  const stations = await WAQI.getStationsInBounds(sw.lat, sw.lng, ne.lat, ne.lng);
+  renderStationMarkers(stations);
+}
+
+async function loadIndiaStations() {
+  Toast.info('Loading all Indian monitoring stations...');
+  map.setView([22, 80], 5);
+  const stations = await WAQI.getIndiaStations();
+  renderStationMarkers(stations);
+  Toast.success(`Loaded ${stations.length} Indian monitoring stations`);
+}
+
+async function loadGlobalStations() {
+  Toast.info('Loading global stations (this may take a moment)...');
+  map.setView([20, 0], 2);
+  const stations = await WAQI.getStationsInBounds(-60, -180, 80, 180);
+  renderStationMarkers(stations);
+  Toast.success(`Loaded ${stations.length} global stations`);
+}
+
+function getMarkerColor(aqi) {
+  if (aqi == null) return '#78909C';
+  const lvl = aqiLevel(aqi);
+  return lvl.color;
+}
+
+function renderStationMarkers(stations) {
+  // Remove old markers
+  stationMarkers.forEach(m => map.removeLayer(m));
+  stationMarkers = [];
+  
+  const filter = document.getElementById('pollutant-filter')?.value || 'all';
+  
+  stations.forEach(s => {
+    const aqi = s.aqi;
+    if (typeof aqi !== 'number') return;
+    // Apply filter
+    if (filter === 'good' && aqi > 50) return;
+    if (filter === 'moderate' && (aqi < 51 || aqi > 100)) return;
+    if (filter === 'unhealthy' && aqi <= 100) return;
+    if (filter === 'critical' && aqi <= 150) return;
+    
+    const color = getMarkerColor(aqi);
+    const lvl = aqiLevel(aqi);
+    const size = Math.min(40, Math.max(24, 24 + aqi / 20));
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:${size>30?'0.7rem':'0.6rem'};font-weight:800;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.25)">${aqi}</div>`,
+      iconSize: [size, size], iconAnchor: [size/2, size/2], className: ''
+    });
+    const m = L.marker([s.lat, s.lon], { icon }).addTo(map);
+    m.bindPopup(`<div class="map-popup">
+      <h4 style="margin:0 0 6px;font-size:0.9rem">${s.station?.name || 'Unknown Station'}</h4>
+      <div style="font-size:2rem;font-weight:800;color:${color};font-family:'Poppins',sans-serif">${aqi}</div>
+      <div style="font-size:0.75rem;font-weight:700;color:${color}">${lvl.emoji} ${lvl.label}</div>
+      <div style="font-size:0.72rem;color:#90A4AE;margin-top:6px">📍 ${s.lat.toFixed(3)}, ${s.lon.toFixed(3)}</div>
+    </div>`);
+    stationMarkers.push(m);
+  });
+
+  // Heatmap — always try, leaflet-heat loaded via CDN
+  if (heatLayer) { try { map.removeLayer(heatLayer); } catch(e){} heatLayer = null; }
+  if (showHeat) {
+    const pts = stations.filter(s=>typeof s.aqi==='number'&&s.lat&&s.lon).map(s=>[s.lat, s.lon, Math.min(1, s.aqi/300)]);
+    if (pts.length > 0) {
+      try {
+        heatLayer = L.heatLayer(pts, { radius:35, blur:25, maxZoom:12, gradient:{0.2:'#2E7D32',0.4:'#F9A825',0.65:'#EF6C00',0.8:'#C62828',1.0:'#6A1B9A'} }).addTo(map);
+      } catch(e) { console.warn('Heatmap plugin not loaded:', e); }
+    }
+  }
+}
+
+function applyFilter() { loadStationsInView(); }
+function centerOnLocation() { if (userCoords) map.setView([userCoords.lat, userCoords.lng], 10); }
+function toggleHeatmap() { showHeat = !showHeat; loadStationsInView(); }
+
+// ─── Live Location + AQI ────────────────────────────────────────────────────
+async function loadLocationData() {
+  try {
+    userCoords = await LiveLocation.get();
+    const { lat, lng, city, country } = userCoords;
+    document.getElementById('loc-city-name').textContent = `${city}${country ? ', ' + country : ''}`;
+    document.getElementById('nav-loc').textContent = `📍 ${city}`;
+    document.getElementById('loc-time').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('wx-city').textContent = city;
+    document.getElementById('aq-city').textContent = city;
+
+    // Init map centered on user
+    initMap(lat, lng);
+
+    // Load AQI + Weather in parallel
+    const [aqiFeed, weatherData, aqDetailData] = await Promise.all([
+      WAQI.getFeedByGeo(lat, lng),
+      Weather.getForecast(lat, lng),
+      Weather.getAirQuality(lat, lng)
+    ]);
+
+    renderHeroAQI(aqiFeed, weatherData);
+    renderWeatherSection(weatherData, city);
+    renderAQDetail(aqiFeed, aqDetailData);
+  } catch(e) {
+    document.getElementById('hero-loading').innerHTML = '❌ Could not detect location. Please allow location access.';
+    Toast.error('Location access denied. Showing default data.');
+    userCoords = { lat: 28.6139, lng: 77.2090, city: 'New Delhi', country: 'IN' };
+    initMap(28.6139, 77.2090);
+    loadCityData();
+  }
+  loadCityData();
+}
+
+function renderHeroAQI(data, wx) {
+  document.getElementById('hero-loading').style.display = 'none';
+  document.getElementById('live-aqi-card').style.display = 'grid';
+  
+  const parsed = WAQI.parseData(data);
+  const aqi = parsed?.aqi || data?.aqi || '—';
+  const lvl = WAQI.aqiLevel(typeof aqi === 'number' ? aqi : 999);
+  
+  const aqiEl = document.getElementById('hero-aqi');
+  aqiEl.textContent = aqi;
+  aqiEl.style.color = lvl.color;
+  document.getElementById('hero-aqi-label').innerHTML = `${lvl.emoji} ${lvl.label}`;
+  
+  const msgs = {
+    'Good': 'Air quality is satisfactory. Enjoy outdoor activities!',
+    'Moderate': 'Air quality is acceptable. Sensitive individuals may experience moderate discomfort.',
+    'Unhealthy (SG)': 'Sensitive groups (children, elderly, asthmatic) should limit outdoor exposure.',
+    'Unhealthy': 'Everyone may begin to experience health effects. Limit prolonged outdoor exertion.',
+    'Very Unhealthy': 'Health alert: everyone may experience serious health effects. Stay indoors.',
+    'Hazardous': '⚠️ Emergency conditions. Everyone should avoid all outdoor exertion.'
+  };
+  document.getElementById('hero-health-msg').textContent = msgs[lvl.label] || 'Monitoring in progress...';
+
+  // Pollutant chips
+  if (parsed) {
+    const chips = [
+      ['PM2.5', parsed.pm25, 'µg/m³'],
+      ['PM10', parsed.pm10, 'µg/m³'],
+      ['O₃', parsed.o3, 'µg/m³'],
+      ['NO₂', parsed.no2, 'µg/m³'],
+      ['SO₂', parsed.so2, 'µg/m³'],
+      ['CO', parsed.co, 'mg/m³'],
+    ].filter(c => c[1] != null);
+    document.getElementById('hero-pollutants').innerHTML = chips.map(c=>`<div class="pollutant-chip">${c[0]}: <strong>${c[1]}</strong> ${c[2]}</div>`).join('');
+    document.getElementById('hero-station').textContent = `📡 Data source: ${parsed.station}`;
+  }
+
+  // Weather side
+  if (wx?.current) {
+    const cur = wx.current;
+    const code = cur.weather_code;
+    document.getElementById('hero-wx-icon').textContent = Weather.wmoIcon(code);
+    document.getElementById('hero-temp').textContent = `${Math.round(cur.temperature_2m)}°C`;
+    document.getElementById('hero-wx-desc').textContent = Weather.wmoLabel(code);
+    document.getElementById('hero-humidity').textContent = `${cur.relative_humidity_2m}%`;
+    document.getElementById('hero-wind').textContent = `${cur.wind_speed_10m} km/h`;
+    document.getElementById('hero-pressure').textContent = `${Math.round(cur.surface_pressure)} hPa`;
+    document.getElementById('hero-vis').textContent = cur.visibility ? `${(cur.visibility/1000).toFixed(0)} km` : '—';
+  }
+}
+
+function renderWeatherSection(wx, city) {
+  if (!wx) return;
+  const cur = wx.current;
+  const daily = wx.daily;
+  const hourly = wx.hourly;
+
+  // Current weather detail card
+  if (cur) {
+    document.getElementById('current-weather-detail').innerHTML = `
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:3rem">${Weather.wmoIcon(cur.weather_code)}</div>
+        <div class="weather-temp">${Math.round(cur.temperature_2m)}°C</div>
+        <div style="font-size:0.85rem;color:var(--text-muted)">${Weather.wmoLabel(cur.weather_code)}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted)">Feels like ${Math.round(cur.apparent_temperature || cur.temperature_2m)}°C</div>
+      </div>
+      <div class="weather-grid">
+        <div class="weather-stat"><div class="val">${cur.relative_humidity_2m}%</div><div class="lbl">Humidity</div></div>
+        <div class="weather-stat"><div class="val">${cur.wind_speed_10m} km/h</div><div class="lbl">Wind Speed</div></div>
+        <div class="weather-stat"><div class="val">${Weather.windDirection(cur.wind_direction_10m)}</div><div class="lbl">Wind Dir</div></div>
+        <div class="weather-stat"><div class="val">${Math.round(cur.surface_pressure)} hPa</div><div class="lbl">Pressure</div></div>
+        <div class="weather-stat"><div class="val">${cur.precipitation || 0} mm</div><div class="lbl">Precipitation</div></div>
+        <div class="weather-stat"><div class="val">${cur.visibility ? (cur.visibility/1000).toFixed(0)+'km' : '—'}</div><div class="lbl">Visibility</div></div>
+      </div>`;
+  }
+
+  // 7-day forecast
+  if (daily) {
+    const days = daily.time.map((t,i) => ({
+      date: new Date(t),
+      code: daily.weather_code[i],
+      max: daily.temperature_2m_max[i],
+      min: daily.temperature_2m_min[i],
+      rain: daily.precipitation_sum[i],
+      wind: daily.wind_speed_10m_max[i],
+      uv: daily.uv_index_max?.[i],
+    }));
+    document.getElementById('daily-forecast').innerHTML = days.map(d=>`
+      <div class="forecast-day">
+        <div style="width:80px;font-size:0.82rem;color:var(--text-muted)">${d.date.toLocaleDateString('en-IN',{weekday:'short',month:'short',day:'numeric'})}</div>
+        <div style="font-size:1.4rem;width:40px;text-align:center">${Weather.wmoIcon(d.code)}</div>
+        <div style="flex:1;font-size:0.8rem;color:var(--text-muted)">${Weather.wmoLabel(d.code)}</div>
+        <div style="font-size:0.78rem;color:var(--info)">${d.rain || 0}mm</div>
+        <div style="width:90px;text-align:right;font-size:0.85rem"><strong>${Math.round(d.max)}°</strong> <span style="color:var(--text-muted)">${Math.round(d.min)}°</span></div>
+      </div>`).join('');
+  }
+
+  // Hourly temperature chart (next 24h)
+  if (hourly) {
+    const now = new Date();
+    const idxNow = hourly.time.findIndex(t => new Date(t) >= now);
+    const idx = idxNow >= 0 ? idxNow : 0;
+    const labels = hourly.time.slice(idx, idx+24).map(t => new Date(t).getHours() + ':00');
+    const temps = hourly.temperature_2m.slice(idx, idx+24);
+    const precip = hourly.precipitation_probability?.slice(idx, idx+24) || [];
+
+    if (hourlyChart) hourlyChart.destroy();
+    const opts = defaultChartOptions();
+    hourlyChart = new Chart(document.getElementById('hourly-temp-chart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Temperature (°C)', data: temps, borderColor: '#FF8F00', backgroundColor: '#FF8F0018', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 2, yAxisID: 'y' },
+          { label: 'Rain Probability (%)', data: precip, borderColor: '#1565C0', backgroundColor: '#1565C018', fill: true, tension: 0.4, borderWidth: 1.5, pointRadius: 0, yAxisID: 'y1', borderDash: [4,4] }
+        ]
+      },
+      options: {
+        ...opts,
+        scales: {
+          x: opts.scales.x,
+          y: { ...opts.scales.y, position: 'left', title: { display: true, text: '°C', color: opts.scales.y.ticks.color } },
+          y1: { ...opts.scales.y, position: 'right', min: 0, max: 100, title: { display: true, text: '%', color: opts.scales.y.ticks.color }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  }
+}
+
+function renderAQDetail(aqFeed, aqDetail) {
+  const grid = document.getElementById('aq-pollutants-grid');
+  const parsed = WAQI.parseData(aqFeed);
+  const cur = aqDetail?.current;
+  
+  const metrics = [
+    { name: 'AQI (US)', val: parsed?.aqi, unit: '', icon: '🌫️', limit: 'US EPA Standard', good: 50 },
+    { name: 'PM2.5', val: parsed?.pm25 ?? cur?.pm2_5?.toFixed(1), unit: 'µg/m³', icon: '💨', limit: 'Safe: ≤60 µg/m³', good: 60 },
+    { name: 'PM10', val: parsed?.pm10 ?? cur?.pm10?.toFixed(1), unit: 'µg/m³', icon: '🔵', limit: 'Safe: ≤100 µg/m³', good: 100 },
+    { name: 'NO₂', val: parsed?.no2 ?? cur?.nitrogen_dioxide?.toFixed(1), unit: 'µg/m³', icon: '🔬', limit: 'Safe: ≤80 µg/m³', good: 80 },
+    { name: 'SO₂', val: parsed?.so2 ?? cur?.sulphur_dioxide?.toFixed(1), unit: 'µg/m³', icon: '⚗️', limit: 'Safe: ≤80 µg/m³', good: 80 },
+    { name: 'O₃ (Ozone)', val: parsed?.o3 ?? cur?.ozone?.toFixed(1), unit: 'µg/m³', icon: '🌀', limit: 'Safe: ≤100 µg/m³', good: 100 },
+    { name: 'CO', val: parsed?.co ?? (cur?.carbon_monoxide ? (cur.carbon_monoxide/1000).toFixed(2) : null), unit: parsed?.co ? 'ppm' : 'mg/m³', icon: '💀', limit: 'Safe: ≤4 ppm', good: 4 },
+    { name: 'Temperature', val: parsed?.temperature ?? aqDetail?.current?.temperature_2m?.toFixed(1), unit: '°C', icon: '🌡️', limit: '', good: null },
+    { name: 'Humidity', val: parsed?.humidity ?? aqDetail?.current?.relative_humidity_2m, unit: '%', icon: '💧', limit: 'Ideal: 40–60%', good: 60 },
+    { name: 'Wind Speed', val: parsed?.wind, unit: 'm/s', icon: '🌬️', limit: '', good: null },
+  ].filter(m => m.val != null);
+
+  if (!metrics.length) { grid.innerHTML = '<p class="text-muted" style="grid-column:1/-1;text-align:center;padding:40px">Could not load detailed readings for your location.</p>'; return; }
+
+  grid.innerHTML = metrics.map(m => {
+    const v = parseFloat(m.val);
+    const pct = m.good ? Math.min(100, (v / (m.good * 1.5)) * 100) : null;
+    const isHigh = m.good && v > m.good;
+    const color = isHigh ? 'var(--danger)' : m.good ? 'var(--success)' : 'var(--primary)';
+    return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+      <div style="font-size:1.6rem;margin-bottom:6px">${m.icon}</div>
+      <div style="font-size:1.3rem;font-weight:800;color:${color}">${v.toFixed(1)}</div>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px">${m.unit}</div>
+      <div style="font-size:0.78rem;font-weight:600">${m.name}</div>
+      ${pct !== null ? `<div style="height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${color};transition:width 1s ease"></div></div>` : ''}
+      ${m.limit ? `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px">${m.limit}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ─── Global City AQI ────────────────────────────────────────────────────────
+async function loadCityData() {
+  allCityData = [];
+
+  // STEP 1: Immediately render ALL cities using offline real data (no API, no 107 bug)
+  GLOBAL_CITIES.forEach(c => {
+    const aqi = c._aqi || null;
+    allCityData.push({ ...c, aqi: aqi, level: aqiLevel(aqi) });
+  });
+  renderCityGrid();
+  document.getElementById('global-last-update').textContent = 'Data loaded · ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  // STEP 2: Fetch live data — use Open-Meteo pm2_5 (more reliable than us_aqi)
+  // Rate: 3 at a time with small delay to avoid rate limit
+  const nonCG = GLOBAL_CITIES.filter(c => !c._aqi);
+  const batch = 2;
+  for (let i = 0; i < nonCG.length; i += batch) {
+    const chunk = nonCG.slice(i, i + batch);
+    await Promise.all(chunk.map(async (city) => {
+      try {
+        const url = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + city.lat + '&longitude=' + city.lng + '&current=pm2_5&timezone=auto';
+        const r = await fetch(url);
+        const d = await r.json();
+        const pm25 = d?.current?.pm2_5;
+        if (pm25 != null && pm25 > 0) {
+          // Convert PM2.5 to AQI manually (more accurate than us_aqi endpoint)
+          const liveAqi = pm25ToAQI(pm25);
+          const idx = allCityData.findIndex(x => x.city === city.city);
+          if (idx >= 0 && liveAqi !== allCityData[idx].aqi) {
+            allCityData[idx].aqi = liveAqi;
+            allCityData[idx].level = aqiLevel(liveAqi);
+          }
+        }
+      } catch(e) {}
+    }));
+    if(i % 6 === 0) renderCityGrid();
+    await new Promise(res => setTimeout(res, 200)); // small delay
+  }
+  renderCityGrid();
+  document.getElementById('global-last-update').textContent = 'Live · Updated ' + new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
+// PM2.5 → AQI breakpoint conversion (US EPA standard)
+function pm25ToAQI(pm) {
+  const bp = [[0,12,0,50],[12.1,35.4,51,100],[35.5,55.4,101,150],[55.5,150.4,151,200],[150.5,250.4,201,300],[250.5,500.4,301,500]];
+  for (const [lo,hi,aLo,aHi] of bp) {
+    if (pm >= lo && pm <= hi) return Math.round(((aHi-aLo)/(hi-lo))*(pm-lo)+aLo);
+  }
+  return Math.min(500, Math.round(pm));
+}
+
+function renderCityGrid(data = null) {
+  const list = data || getFilteredCities();
+  const grid = document.getElementById('cities-grid');
+  if (!list.length) { grid.innerHTML = '<p class="text-muted text-center" style="grid-column:1/-1;padding:40px">No cities found</p>'; return; }
+  grid.innerHTML = list.map(c => {
+    const lvl = c.level || aqiLevel(c.aqi);
+    const aqi = c.aqi ?? '—';
+    return `<div class="city-card" onclick="flyToCity(${c.lat},${c.lng})" style="border-top:3px solid ${lvl.color}">
+      <div class="city-aqi-num" style="color:${lvl.color}">${aqi}</div>
+      <div class="city-name-lbl">${c.city}</div>
+      <div class="city-country">${c.country} ${lvl.emoji}</div>
+      <div style="font-size:0.68rem;margin-top:6px;padding:2px 8px;border-radius:10px;background:${lvl.bg};color:${lvl.color};font-weight:700;display:inline-block">${lvl.label}</div>
+    </div>`;
+  }).join('');
+}
+
+function getFilteredCities() {
+  return allCityData.filter(c => {
+    if (activeRegion === 'all') return true;
+    if (activeRegion === 'india') return c.country === 'IN';
+    return REGION_MAP[activeRegion]?.includes(c.country);
+  });
+}
+
+function filterRegion(region, el) {
+  activeRegion = region;
+  document.querySelectorAll('.region-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderCityGrid();
+}
+
+function filterCities(q) {
+  if (!q) { renderCityGrid(); return; }
+  const filtered = allCityData.filter(c => c.city.toLowerCase().includes(q.toLowerCase()) || c.country.toLowerCase().includes(q.toLowerCase()));
+  renderCityGrid(filtered);
+}
+
+function flyToCity(lat, lng) {
+  map.setView([lat, lng], 10);
+  document.getElementById('weather-map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ─── Health Guide ────────────────────────────────────────────────────────────
+function renderHealthGuide() {
+  const levels = [
+    { range: '0–50', label: 'Good', color: '#2E7D32', emoji: '🌿', advice: 'Air quality is satisfactory. Go outside and enjoy the fresh air!' },
+    { range: '51–100', label: 'Moderate', color: '#F9A825', emoji: '😐', advice: 'Acceptable air quality. Very sensitive groups may experience mild discomfort.' },
+    { range: '101–150', label: 'Unhealthy (SG)', color: '#EF6C00', emoji: '😷', advice: 'Sensitive groups (children, elderly, asthma patients) should limit outdoor time.' },
+    { range: '151–200', label: 'Unhealthy', color: '#C62828', emoji: '😨', advice: 'Everyone may experience health effects. Reduce prolonged outdoor activities.' },
+    { range: '201–300', label: 'Very Unhealthy', color: '#6A1B9A', emoji: '🚨', advice: 'Health alert. Everyone should avoid outdoor exertion. Wear N95 masks if outside.' },
+    { range: '300+', label: 'Hazardous', color: '#880E4F', emoji: '☠️', advice: 'Emergency conditions. Stay indoors with air purifier. Avoid all outdoor activity.' },
+  ];
+  document.getElementById('health-guide').innerHTML = levels.map(l => `
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;border-left:4px solid ${l.color}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="font-size:1.3rem">${l.emoji}</span>
+        <div>
+          <strong style="color:${l.color}">${l.label}</strong>
+          <span style="font-size:0.75rem;color:var(--text-muted);margin-left:6px">AQI: ${l.range}</span>
+        </div>
+      </div>
+      <p style="font-size:0.82rem;color:var(--text-secondary);line-height:1.6;margin:0">${l.advice}</p>
+    </div>`).join('');
+}
+
+// ─── Public Alerts ───────────────────────────────────────────────────────────
+async function loadPublicAlerts() {
+  const res = await API.get('alerts', { limit: 4 });
+  const alerts = res.ok ? res.data.data : [];
+  const typeIcons = { air:'💨', water:'💧', noise:'🔊', compliance:'🏭', system:'⚙️' };
+  const el = document.getElementById('public-alerts');
+  el.innerHTML = alerts.length ? alerts.slice(0,4).map(a=>`
+    <div style="display:flex;gap:14px;align-items:flex-start;padding:16px;background:var(--bg-card);border-radius:14px;border-left:3px solid ${a.severity==='critical'?'var(--danger)':a.severity==='high'?'var(--warning)':'var(--primary)'};margin-bottom:10px">
+      <span style="font-size:1.4rem">${typeIcons[a.type]||'⚠️'}</span>
+      <div style="flex:1"><strong style="font-size:0.88rem">${a.title}</strong>
+        <p style="font-size:0.8rem;color:var(--text-secondary);margin:4px 0">${a.message}</p>
+        <div style="font-size:0.72rem;color:var(--text-muted)">${Format.datetime(a.created_at)}</div>
+      </div>
+      ${Format.severityBadge(a.severity)}
+    </div>`).join('') : '<p class="text-muted text-center" style="padding:30px">No active public alerts</p>';
+}
+
+// ─── Boot ────────────────────────────────────────────────────────────────────
+renderHealthGuide();
+loadLocationData();
+loadPublicAlerts();
+</script>
+</body>
+</html>

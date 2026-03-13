@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Monitoring – PrithviNet</title>
+  <link rel="stylesheet" href="assets/css/custom.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <div id="app-root">
+    <div class="main-content" id="main-content">
+      <div class="page-content">
+        <div class="page-header fade-in">
+          <div><h1>🌡️ Pollution Monitoring</h1><p>Submit readings and view monitoring station data</p></div>
+          <button class="btn btn-primary" onclick="Modal.open('submit-modal')">+ Submit Reading</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="card p-3 mb-3 fade-in">
+          <div class="tab-wrapper">
+            <div class="tabs">
+              <button class="tab-btn active" data-tab="air" onclick="switchTab('air',this)">💨 Air Quality</button>
+              <button class="tab-btn" data-tab="water" onclick="switchTab('water',this)">💧 Water Quality</button>
+              <button class="tab-btn" data-tab="noise" onclick="switchTab('noise',this)">🔊 Noise Levels</button>
+              <button class="tab-btn" data-tab="stations" onclick="switchTab('stations',this)">📡 Stations</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar fade-in">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input class="form-control" id="search-input" placeholder="Search readings..." oninput="applyFilters()"/>
+          </div>
+          <select class="form-control" id="status-filter" onchange="applyFilters()">
+            <option value="">All Status</option>
+            <option value="normal">Normal</option>
+            <option value="warning">Warning</option>
+            <option value="critical">Critical</option>
+          </select>
+          <select class="form-control" id="date-filter" onchange="applyFilters()">
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 3 months</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="exportCSV(allReadings, ['station_name','type','parameter','value','unit','status','recorded_at'], 'readings_export.csv')">⬇ Export CSV</button>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-2 mb-3 fade-in">
+          <div class="card p-3">
+            <div class="chart-title mb-2" id="param-chart-title">Air Quality Chart</div>
+            <div style="height:220px"><canvas id="param-chart"></canvas></div>
+          </div>
+          <div class="card p-3">
+            <div class="chart-title mb-2">Status Distribution</div>
+            <div style="height:220px"><canvas id="status-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="card fade-in">
+          <div class="p-3" style="padding-bottom:0;display:flex;align-items:center;justify-content:space-between">
+            <div class="chart-title" id="table-title">Air Pollution Readings</div>
+            <span class="text-muted" style="font-size:0.8rem" id="record-count">Loading...</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Station</th><th>Region</th><th>Parameter</th>
+                  <th>Value</th><th>Status</th><th>Recorded At</th>
+                </tr>
+              </thead>
+              <tbody id="readings-tbody">
+                <tr><td colspan="6" class="text-center" style="padding:40px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="p-3 flex-between" style="border-top:1px solid var(--border)">
+            <button class="btn btn-secondary btn-sm" id="prev-btn" onclick="changePage(-1)">← Previous</button>
+            <span class="text-muted" style="font-size:0.83rem" id="page-info">Page 1</span>
+            <button class="btn btn-secondary btn-sm" id="next-btn" onclick="changePage(1)">Next →</button>
+          </div>
+        </div>
+
+        <!-- Stations Table (hidden by default) -->
+        <div id="stations-section" style="display:none">
+          <div class="card mt-3 fade-in">
+            <div class="p-3 flex-between" style="padding-bottom:0">
+              <div class="chart-title">Monitoring Stations</div>
+              <button class="btn btn-primary btn-sm" onclick="Modal.open('station-modal')">+ Add Station</button>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead><tr><th>Name</th><th>Type</th><th>Region</th><th>Coordinates</th><th>Status</th><th>Installed</th></tr></thead>
+                <tbody id="stations-tbody">
+                  <tr><td colspan="6" class="text-center" style="padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Submit Reading Modal -->
+<div class="modal-overlay" id="submit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Submit Pollution Reading</h3>
+      <button class="btn btn-icon btn-secondary" onclick="Modal.close('submit-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="reading-form" novalidate>
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label class="form-label">Monitoring Station *</label>
+            <select class="form-control" id="r-station"><option value="">Select station...</option></select>
+            <div class="form-error" id="r-station-error">Station required.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Pollution Type *</label>
+            <select class="form-control" id="r-type" onchange="updateParams()">
+              <option value="air">Air</option><option value="water">Water</option><option value="noise">Noise</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label class="form-label">Parameter *</label>
+            <select class="form-control" id="r-param">
+              <option value="PM2.5">PM2.5</option><option value="PM10">PM10</option>
+              <option value="NO2">NO2</option><option value="SO2">SO2</option><option value="CO">CO</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit *</label>
+            <select class="form-control" id="r-unit">
+              <option value="µg/m³">µg/m³</option><option value="mg/L">mg/L</option><option value="dB">dB</option><option value="pH">pH</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Measured Value *</label>
+          <input class="form-control" type="number" step="0.01" id="r-value" placeholder="e.g. 87.5"/>
+          <div class="form-error" id="r-value-error">Value required.</div>
+        </div>
+        <div id="threshold-hint" style="font-size:0.78rem;color:var(--text-muted);margin-top:-12px;margin-bottom:14px"></div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('submit-modal')">Cancel</button>
+      <button class="btn btn-primary" id="submit-btn" onclick="submitReading()">Submit Reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Station Modal -->
+<div class="modal-overlay" id="station-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Monitoring Station</h3>
+      <button class="btn btn-icon btn-secondary" onclick="Modal.close('station-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="station-form" novalidate>
+        <div class="form-group"><label class="form-label">Station Name *</label><input class="form-control" id="s-name" placeholder="Station name"/></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group"><label class="form-label">Type *</label>
+            <select class="form-control" id="s-type"><option value="air">Air</option><option value="water">Water</option><option value="noise">Noise</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">Region *</label><input class="form-control" id="s-region" placeholder="Delhi"/></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group"><label class="form-label">Latitude *</label><input class="form-control" type="number" step="0.0001" id="s-lat" placeholder="28.6139"/></div>
+          <div class="form-group"><label class="form-label">Longitude *</label><input class="form-control" type="number" step="0.0001" id="s-lng" placeholder="77.2090"/></div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="Modal.close('station-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="addStation()">Add Station</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+initApp('Monitoring');
+let allReadings = [], currentPage = 1, pageSize = 10, currentType = 'air';
+let paramChart, statusChart;
+
+const paramOptions = {
+  air: [{v:'PM2.5',u:'µg/m³'},{v:'PM10',u:'µg/m³'},{v:'NO2',u:'µg/m³'},{v:'SO2',u:'µg/m³'},{v:'CO',u:'mg/m³'},{v:'AQI',u:'index'}],
+  water: [{v:'BOD',u:'mg/L'},{v:'DO',u:'mg/L'},{v:'pH',u:'pH'},{v:'COD',u:'mg/L'},{v:'Turbidity',u:'NTU'}],
+  noise: [{v:'Leq',u:'dB'},{v:'Lmax',u:'dB'},{v:'Lmin',u:'dB'}]
+};
+const thresholds = {
+  'PM2.5':'NAAQS limit: 60 µg/m³ (24h)','PM10':'NAAQS limit: 100 µg/m³','NO2':'NAAQS limit: 80 µg/m³',
+  'SO2':'NAAQS limit: 80 µg/m³','BOD':'IS limit: 30 mg/L','DO':'Min: 5 mg/L for Class B','pH':'Range: 6.5–8.5',
+  'Leq':'Industrial: 75 dB (day)','Lmax':'Threshold: 90 dB'
+};
+
+function updateParams() {
+  const type = document.getElementById('r-type').value;
+  const pSel = document.getElementById('r-param');
+  const uSel = document.getElementById('r-unit');
+  pSel.innerHTML = paramOptions[type].map(p=>`<option value="${p.v}">${p.v}</option>`).join('');
+  uSel.value = paramOptions[type][0].u;
+  updateThresholdHint();
+}
+
+function updateThresholdHint() {
+  const param = document.getElementById('r-param').value;
+  const hint = document.getElementById('threshold-hint');
+  hint.textContent = thresholds[param] ? `ℹ️ ${thresholds[param]}` : '';
+}
+
+function switchTab(type, el) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  currentType = type;
+  document.getElementById('stations-section').style.display = type === 'stations' ? 'block' : 'none';
+  if (type !== 'stations') {
+    loadReadings(type);
+    document.getElementById('table-title').textContent = `${type.charAt(0).toUpperCase()+type.slice(1)} Pollution Readings`;
+    document.getElementById('param-chart-title').textContent = type.charAt(0).toUpperCase()+type.slice(1)+' Quality Chart';
+    document.querySelector('[data-tab="air"]').closest('.card')?.querySelector('.tab-wrapper').style;
+  } else {
+    loadStations();
+  }
+}
+
+async function loadReadings(type) {
+  const tbody = document.getElementById('readings-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>';
+  
+  const res = await API.get('readings', { type, limit: 100 });
+  
+  // Use demo data if empty
+  const demoData = generateDemoReadings(type);
+  allReadings = (res.ok && res.data.data?.length) ? res.data.data : demoData;
+  
+  updateCharts(type);
+  renderTable();
+  document.getElementById('record-count').textContent = `${allReadings.length} records`;
+}
+
+function generateDemoReadings(type) {
+  const params = { air:['PM2.5','PM10','NO2','SO2'], water:['BOD','DO','pH'], noise:['Leq','Lmax'] };
+  const units = { air:'µg/m³', water:'mg/L', noise:'dB' };
+  const stations = ['Delhi Air Station 1','Chennai Air Monitor','Bangalore Tech Park','Jaipur Air Monitor'];
+  const regions = ['Delhi','Chennai','Bangalore','Jaipur'];
+  return Array.from({length:25},(_,i)=>({
+    station_name: stations[i%stations.length],
+    region: regions[i%regions.length],
+    type, parameter: params[type][i%params[type].length],
+    value: (Math.random()*150+20).toFixed(2),
+    unit: units[type],
+    status: ['normal','warning','critical'][Math.floor(Math.random()*3)],
+    recorded_at: new Date(Date.now()-i*3600000).toISOString()
+  }));
+}
+
+function applyFilters() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const status = document.getElementById('status-filter').value;
+  allReadings = allReadings.filter(r => {
+    const matchSearch = !search || [r.station_name,r.parameter,r.region].some(f=>(f||'').toLowerCase().includes(search));
+    const matchStatus = !status || r.status === status;
+    return matchSearch && matchStatus;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('readings-tbody');
+  const start = (currentPage-1)*pageSize;
+  const page = allReadings.slice(start, start+pageSize);
+  if (!page.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:30px">No records found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = page.map(r=>`<tr>
+    <td><strong>${r.station_name||'—'}</strong></td>
+    <td>${r.region||'—'}</td>
+    <td><code>${r.parameter}</code></td>
+    <td><strong>${Number(r.value).toFixed(2)}</strong> <span class="text-muted" style="font-size:0.75rem">${r.unit}</span></td>
+    <td>${Format.badge(r.status)}</td>
+    <td class="text-muted" style="font-size:0.8rem">${Format.datetime(r.recorded_at)}</td>
+  </tr>`).join('');
+  document.getElementById('page-info').textContent = `Page ${currentPage} of ${Math.ceil(allReadings.length/pageSize)}`;
+  document.getElementById('prev-btn').disabled = currentPage === 1;
+  document.getElementById('next-btn').disabled = start + pageSize >= allReadings.length;
+}
+
+function changePage(dir) {
+  currentPage += dir;
+  renderTable();
+}
+
+function updateCharts(type) {
+  const params = {};
+  allReadings.slice(0,20).forEach(r=>{ if(!params[r.parameter]) params[r.parameter]=[]; params[r.parameter].push(parseFloat(r.value)); });
+  const paramKeys = Object.keys(params).slice(0,5);
+  const avgValues = paramKeys.map(p=>params[p].reduce((a,b)=>a+b,0)/params[p].length);
+  const colors = getChartColors(paramKeys.length);
+  
+  if (paramChart) paramChart.destroy();
+  paramChart = new Chart(document.getElementById('param-chart'), {
+    type:'bar',
+    data:{ labels:paramKeys, datasets:[{label:'Avg Value',data:avgValues, backgroundColor:colors.map(c=>c+'bb'), borderColor:colors, borderWidth:1.5, borderRadius:8}] },
+    options:{ ...defaultChartOptions(), indexAxis:'y' }
+  });
+
+  const counts = {normal:0,warning:0,critical:0};
+  allReadings.forEach(r=>{ counts[r.status] = (counts[r.status]||0)+1; });
+  if (statusChart) statusChart.destroy();
+  statusChart = new Chart(document.getElementById('status-chart'), {
+    type:'pie',
+    data:{ labels:['Normal','Warning','Critical'], datasets:[{data:[counts.normal,counts.warning,counts.critical], backgroundColor:['#2E7D32','#F57C00','#C62828'], borderWidth:0}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color: defaultChartOptions().plugins.legend.labels.color, font:{size:11}, padding:10 } } } }
+  });
+}
+
+async function loadStations() {
+  const res = await API.get('stations');
+  const stations = res.ok ? res.data.data : [];
+  const tbody = document.getElementById('stations-tbody');
+  if (!stations.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:30px">No stations found. Add one above.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = stations.map(s=>`<tr>
+    <td><strong>${s.name}</strong></td>
+    <td>${{air:'💨 Air',water:'💧 Water',noise:'🔊 Noise'}[s.type]||s.type}</td>
+    <td>${s.region}</td>
+    <td class="text-muted" style="font-size:0.78rem">${s.lat}, ${s.lng}</td>
+    <td>${Format.badge(s.status)}</td>
+    <td class="text-muted" style="font-size:0.8rem">${Format.date(s.installed_at)}</td>
+  </tr>`).join('');
+}
+
+async function loadStationOptions() {
+  const res = await API.get('stations');
+  const sel = document.getElementById('r-station');
+  if (res.ok && res.data.data.length) {
+    sel.innerHTML = '<option value="">Select station...</option>' + res.data.data.map(s=>`<option value="${s.id}">${s.name} (${s.region})</option>`).join('');
+  }
+}
+
+async function submitReading() {
+  const stationId = document.getElementById('r-station').value;
+  const type = document.getElementById('r-type').value;
+  const parameter = document.getElementById('r-param').value;
+  const value = document.getElementById('r-value').value;
+  const unit = document.getElementById('r-unit').value;
+  const user = Auth.getUser();
+
+  if (!stationId) { document.getElementById('r-station-error').classList.add('visible'); return; }
+  if (!value) { document.getElementById('r-value-error').classList.add('visible'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Submitting...';
+
+  const res = await API.post('readings', { station_id: stationId, type, parameter, value, unit, submitted_by: user?.id });
+  btn.disabled = false; btn.textContent = 'Submit Reading';
+
+  if (res.ok && res.data.success) {
+    Modal.close('submit-modal');
+    Toast.success(`Reading submitted! Status: ${res.data.status}`);
+    if (res.data.status !== 'normal') Toast.warning('⚠️ Alert generated — reading exceeded threshold.');
+    loadReadings(currentType);
+    document.getElementById('reading-form').reset();
+  } else {
+    Toast.error(res.data.error || 'Failed to submit reading');
+  }
+}
+
+async function addStation() {
+  const name = document.getElementById('s-name').value.trim();
+  const type = document.getElementById('s-type').value;
+  const region = document.getElementById('s-region').value.trim();
+  const lat = document.getElementById('s-lat').value;
+  const lng = document.getElementById('s-lng').value;
+  if (!name || !region || !lat || !lng) { Toast.error('All fields are required'); return; }
+  const res = await API.post('stations', { name, type, region, lat, lng });
+  if (res.ok) { Modal.close('station-modal'); Toast.success('Station added!'); loadStations(); loadStationOptions(); }
+  else Toast.error(res.data.error || 'Failed to add station');
+}
+
+// Initial load
+loadReadings('air');
+loadStationOptions();
+document.getElementById('r-param').addEventListener('change', updateThresholdHint);
+</script>
+</body>
+</html>
