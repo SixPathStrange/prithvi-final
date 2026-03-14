@@ -85,7 +85,7 @@ a { text-decoration: none; color: inherit; transition: var(--transition); }
 
 /* ========== Navbar ========== */
 .navbar {
-  position: fixed;
+  position:static;
   top: 0;
   left: var(--sidebar-width);
   right: 0;
