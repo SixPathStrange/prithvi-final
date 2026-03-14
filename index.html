@@ -188,7 +188,23 @@
     .benefit-item p { font-size: 0.82rem; color: var(--text-secondary); }
 
     /* ── Roles ── */
-    .roles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 16px; }
+    
+    /* .roles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 20px; } */
+    
+    .roles-grid {
+  display: grid;
+  /* Use auto-fit to make items spread out to fill space, 
+     or keep auto-fill to keep them aligned to the left */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+  
+  /* --- Add these lines --- */
+  width: 90%;            /* Or any preferred width (e.g., 1200px) */
+  max-width: 1200px;     /* Prevents it from getting too wide on desktop */
+  margin: 0 auto;        /* Centers the container horizontally */
+}
+
+
     .role-card {
       background: var(--bg-card); border: 1px solid var(--border);
       border-radius: 14px; padding: 24px 16px; text-align: center;
