@@ -95,7 +95,7 @@
       display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
       z-index: 1001; backdrop-filter: blur(4px);
     }
-    .ai-sidebar-overlay.active { display: block; }
+    .ai-sidebar-overlay.active { display: block; pointer-events: auto; }
     .ai-sidebar {
       position: fixed; top: 0; right: -440px; width: 420px; height: 100vh;
       z-index: 1002;
@@ -416,10 +416,16 @@
 <!-- ═══════════════════════════════════════════════════════════ -->
 
 <!-- Floating trigger button -->
-<button class="ai-fab" id="ai-fab-btn" onclick="toggleAI()" title="Ask PrithviNet AI">🌿</button>
+<!-- <button class="ai-fab" id="ai-fab-btn" onclick="toggleAI()" title="Ask PrithviNet AI">🌿</button> -->
+
+<!-- <button class="ai-fab" id="ai-fab-btn" onclick="openAIPage()" title="Ask PrithviNet AI">🌿</button> -->
+
+<button class="ai-fab" id="ai-fab-btn" title="Ask PrithviNet AI">🌿</button>
 
 <!-- Dim overlay -->
 <div class="ai-sidebar-overlay" id="ai-overlay" onclick="closeAI()"></div>
+
+
 
 <!-- Sidebar panel -->
 <aside class="ai-sidebar" id="ai-sidebar">
@@ -757,7 +763,11 @@ function getAIReply(input) {
 // ── AI Sidebar UI functions ───────────────────────────────────────────────────
 let aiOpen = false;
 
-function toggleAI() { aiOpen ? closeAI() : openAI(); }
+// function toggleAI() { aiOpen ? closeAI() : openAI(); }
+
+function openAIPage() {
+    window.open("assistant.html", "_blank");
+}
 
 function openAI() {
   aiOpen = true;
