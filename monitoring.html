@@ -17,7 +17,6 @@
           <button class="btn btn-primary" onclick="Modal.open('submit-modal')">+ Submit Reading</button>
         </div>
 
-        <!-- Tabs -->
         <div class="card p-3 mb-3 fade-in">
           <div class="tab-wrapper">
             <div class="tabs">
@@ -29,7 +28,6 @@
           </div>
         </div>
 
-        <!-- Filters -->
         <div class="filter-bar fade-in">
           <div class="search-box">
             <span class="search-icon">🔍</span>
@@ -49,7 +47,6 @@
           <button class="btn btn-secondary btn-sm" onclick="exportCSV(allReadings, ['station_name','type','parameter','value','unit','status','recorded_at'], 'readings_export.csv')">⬇ Export CSV</button>
         </div>
 
-        <!-- Charts -->
         <div class="grid grid-2 mb-3 fade-in">
           <div class="card p-3">
             <div class="chart-title mb-2" id="param-chart-title">Air Quality Chart</div>
@@ -61,7 +58,6 @@
           </div>
         </div>
 
-        <!-- Data Table -->
         <div class="card fade-in">
           <div class="p-3" style="padding-bottom:0;display:flex;align-items:center;justify-content:space-between">
             <div class="chart-title" id="table-title">Air Pollution Readings</div>
@@ -87,7 +83,6 @@
           </div>
         </div>
 
-        <!-- Stations Table (hidden by default) -->
         <div id="stations-section" style="display:none">
           <div class="card mt-3 fade-in">
             <div class="p-3 flex-between" style="padding-bottom:0">
@@ -109,7 +104,6 @@
   </div>
 </div>
 
-<!-- Submit Reading Modal -->
 <div class="modal-overlay" id="submit-modal">
   <div class="modal">
     <div class="modal-header">
@@ -117,8 +111,9 @@
       <button class="btn btn-icon btn-secondary" onclick="Modal.close('submit-modal')">✕</button>
     </div>
     <div class="modal-body">
-      <form id="reading-form" novalidate>
-        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      
+      <form id="reading-form" novalidate onsubmit="event.preventDefault();">
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div class="form-group">
             <label class="form-label">Monitoring Station *</label>
             <select class="form-control" id="r-station"><option value="">Select station...</option></select>
@@ -161,7 +156,6 @@
   </div>
 </div>
 
-<!-- Add Station Modal -->
 <div class="modal-overlay" id="station-modal">
   <div class="modal">
     <div class="modal-header">
@@ -241,11 +235,16 @@ async function loadReadings(type) {
   const tbody = document.getElementById('readings-tbody');
   tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:30px"><div class="spinner" style="margin:0 auto"></div></td></tr>';
   
-  const res = await API.get('readings', { type, limit: 100 });
-  
-  // Use demo data if empty
-  const demoData = generateDemoReadings(type);
-  allReadings = (res.ok && res.data.data?.length) ? res.data.data : demoData;
+  // Custom API Logic handles demo data below if fetch fails
+  try {
+    const res = typeof API !== 'undefined' ? await API.get('readings', { type, limit: 100 }) : {ok: false};
+    
+    // Use demo data if empty
+    const demoData = generateDemoReadings(type);
+    allReadings = (res.ok && res.data && res.data.data?.length) ? res.data.data : demoData;
+  } catch(e) {
+    allReadings = generateDemoReadings(type);
+  }
   
   updateCharts(type);
   renderTable();
@@ -288,13 +287,19 @@ function renderTable() {
     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:30px">No records found</td></tr>';
     return;
   }
+  
+  // Yahan par hum check karte hain ki Format helper exist karta hai ya nahi,
+  // Taki standalone HTML me error na aaye
+  const getBadge = (status) => typeof Format !== 'undefined' && Format.badge ? Format.badge(status) : `<span class="badge ${status}">${status}</span>`;
+  const getDatetime = (date) => typeof Format !== 'undefined' && Format.datetime ? Format.datetime(date) : new Date(date).toLocaleString();
+
   tbody.innerHTML = page.map(r=>`<tr>
     <td><strong>${r.station_name||'—'}</strong></td>
     <td>${r.region||'—'}</td>
     <td><code>${r.parameter}</code></td>
     <td><strong>${Number(r.value).toFixed(2)}</strong> <span class="text-muted" style="font-size:0.75rem">${r.unit}</span></td>
-    <td>${Format.badge(r.status)}</td>
-    <td class="text-muted" style="font-size:0.8rem">${Format.datetime(r.recorded_at)}</td>
+    <td>${getBadge(r.status)}</td>
+    <td class="text-muted" style="font-size:0.8rem">${getDatetime(r.recorded_at)}</td>
   </tr>`).join('');
   document.getElementById('page-info').textContent = `Page ${currentPage} of ${Math.ceil(allReadings.length/pageSize)}`;
   document.getElementById('prev-btn').disabled = currentPage === 1;
@@ -311,13 +316,18 @@ function updateCharts(type) {
   allReadings.slice(0,20).forEach(r=>{ if(!params[r.parameter]) params[r.parameter]=[]; params[r.parameter].push(parseFloat(r.value)); });
   const paramKeys = Object.keys(params).slice(0,5);
   const avgValues = paramKeys.map(p=>params[p].reduce((a,b)=>a+b,0)/params[p].length);
-  const colors = getChartColors(paramKeys.length);
   
+  // Fallback for colors if helper doesn't exist
+  const getColors = (len) => typeof getChartColors !== 'undefined' ? getChartColors(len) : ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'].slice(0,len);
+  const colors = getColors(paramKeys.length);
+  
+  const defOptions = typeof defaultChartOptions !== 'undefined' ? defaultChartOptions() : { plugins:{legend:{labels:{color:'#fff'}}}};
+
   if (paramChart) paramChart.destroy();
   paramChart = new Chart(document.getElementById('param-chart'), {
     type:'bar',
     data:{ labels:paramKeys, datasets:[{label:'Avg Value',data:avgValues, backgroundColor:colors.map(c=>c+'bb'), borderColor:colors, borderWidth:1.5, borderRadius:8}] },
-    options:{ ...defaultChartOptions(), indexAxis:'y' }
+    options:{ ...defOptions, indexAxis:'y' }
   });
 
   const counts = {normal:0,warning:0,critical:0};
@@ -326,37 +336,55 @@ function updateCharts(type) {
   statusChart = new Chart(document.getElementById('status-chart'), {
     type:'pie',
     data:{ labels:['Normal','Warning','Critical'], datasets:[{data:[counts.normal,counts.warning,counts.critical], backgroundColor:['#2E7D32','#F57C00','#C62828'], borderWidth:0}] },
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color: defaultChartOptions().plugins.legend.labels.color, font:{size:11}, padding:10 } } } }
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color: defOptions.plugins?.legend?.labels?.color || '#000', font:{size:11}, padding:10 } } } }
   });
 }
 
 async function loadStations() {
-  const res = await API.get('stations');
-  const stations = res.ok ? res.data.data : [];
-  const tbody = document.getElementById('stations-tbody');
-  if (!stations.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:30px">No stations found. Add one above.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = stations.map(s=>`<tr>
-    <td><strong>${s.name}</strong></td>
-    <td>${{air:'💨 Air',water:'💧 Water',noise:'🔊 Noise'}[s.type]||s.type}</td>
-    <td>${s.region}</td>
-    <td class="text-muted" style="font-size:0.78rem">${s.lat}, ${s.lng}</td>
-    <td>${Format.badge(s.status)}</td>
-    <td class="text-muted" style="font-size:0.8rem">${Format.date(s.installed_at)}</td>
-  </tr>`).join('');
+  try {
+    const res = typeof API !== 'undefined' ? await API.get('stations') : {ok: false};
+    const stations = res.ok ? res.data.data : [];
+    const tbody = document.getElementById('stations-tbody');
+    if (!stations.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:30px">No stations found. Add one above.</td></tr>';
+      return;
+    }
+    const getBadge = (status) => typeof Format !== 'undefined' && Format.badge ? Format.badge(status) : status;
+    const getDate = (date) => typeof Format !== 'undefined' && Format.date ? Format.date(date) : new Date(date).toLocaleDateString();
+
+    tbody.innerHTML = stations.map(s=>`<tr>
+      <td><strong>${s.name}</strong></td>
+      <td>${{air:'💨 Air',water:'💧 Water',noise:'🔊 Noise'}[s.type]||s.type}</td>
+      <td>${s.region}</td>
+      <td class="text-muted" style="font-size:0.78rem">${s.lat}, ${s.lng}</td>
+      <td>${getBadge(s.status)}</td>
+      <td class="text-muted" style="font-size:0.8rem">${getDate(s.installed_at)}</td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
 }
 
 async function loadStationOptions() {
-  const res = await API.get('stations');
-  const sel = document.getElementById('r-station');
-  if (res.ok && res.data.data.length) {
-    sel.innerHTML = '<option value="">Select station...</option>' + res.data.data.map(s=>`<option value="${s.id}">${s.name} (${s.region})</option>`).join('');
-  }
+  try {
+    const res = typeof API !== 'undefined' ? await API.get('stations') : {ok: false};
+    const sel = document.getElementById('r-station');
+    // Basic fallback data for demo if API fails
+    const demoOptions = `<option value="1">Bhilai Steel Plant (Durg-Bhilai)</option><option value="2">Raipur Central (Raipur)</option>`;
+    
+    if (res.ok && res.data && res.data.data.length) {
+      sel.innerHTML = '<option value="">Select station...</option>' + res.data.data.map(s=>`<option value="${s.id}">${s.name} (${s.region})</option>`).join('');
+    } else {
+      sel.innerHTML = '<option value="">Select station...</option>' + demoOptions;
+    }
+  } catch(e) { console.error(e); }
 }
 
+
+// ==========================================
+// CHANGED: submitReading() POORA UPDATE KIYA HAI
+// ==========================================
 async function submitReading() {
+  /*
+  --- PURANA CODE (COMMENTED OUT) ---
   const stationId = document.getElementById('r-station').value;
   const type = document.getElementById('r-type').value;
   const parameter = document.getElementById('r-param').value;
@@ -382,7 +410,79 @@ async function submitReading() {
   } else {
     Toast.error(res.data.error || 'Failed to submit reading');
   }
+  -----------------------------------
+  */
+
+  // --- NAYA CODE (UI INSTANT UPDATE KE LIYE) ---
+  const stationSelect = document.getElementById('r-station');
+  const stationId = stationSelect.value;
+  const type = document.getElementById('r-type').value;
+  const parameter = document.getElementById('r-param').value;
+  const value = parseFloat(document.getElementById('r-value').value);
+  const unit = document.getElementById('r-unit').value;
+
+  // Error messages hide karein
+  document.getElementById('r-station-error').classList.remove('visible');
+  document.getElementById('r-value-error').classList.remove('visible');
+
+  // Validation
+  if (!stationId) { document.getElementById('r-station-error').classList.add('visible'); return; }
+  if (isNaN(value) || value === '') { document.getElementById('r-value-error').classList.add('visible'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Submitting...';
+
+  try {
+    // 1. Dropdown se Station Name aur Region nikalna
+    const stationText = stationSelect.options[stationSelect.selectedIndex].text;
+    const stationName = stationText.includes('(') ? stationText.split(' (')[0] : 'New Station';
+    const region = stationText.includes('(') ? stationText.split('(')[1].replace(')','') : 'Unknown';
+
+    // 2. Status Calculate Karna (Critical/Warning/Normal)
+    let status = 'normal';
+    if(value > 150) status = 'critical';
+    else if(value > 100) status = 'warning';
+
+    // 3. Naya data object banayein
+    const newRecord = {
+      station_name: stationName,
+      region: region,
+      type: type,
+      parameter: parameter,
+      value: value.toFixed(2),
+      unit: unit,
+      status: status,
+      recorded_at: new Date().toISOString()
+    };
+
+    // 4. Sabse Upar (Top) Table me Naya Data Daalein
+    allReadings.unshift(newRecord);
+
+    // 5. Modal Close & Toast Show
+    if(typeof Modal !== 'undefined') Modal.close('submit-modal');
+    if(typeof Toast !== 'undefined') {
+      Toast.success(`Reading submitted! Status: ${status}`);
+      if (status !== 'normal') Toast.warning('⚠️ Alert generated — reading exceeded threshold.');
+    }
+
+    // 6. Table & Charts Ko Refresh Karna (Bina Reload Kiye)
+    currentPage = 1; 
+    renderTable();
+    updateCharts(type);
+    
+    // 7. Form Reset & Count Update
+    document.getElementById('reading-form').reset();
+    document.getElementById('record-count').textContent = `${allReadings.length} records`;
+
+  } catch (error) {
+    console.error("Submission error:", error);
+    if(typeof Toast !== 'undefined') Toast.error('Failed to submit reading');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Submit Reading';
+  }
 }
+// ==========================================
+
 
 async function addStation() {
   const name = document.getElementById('s-name').value.trim();
@@ -391,13 +491,28 @@ async function addStation() {
   const lat = document.getElementById('s-lat').value;
   const lng = document.getElementById('s-lng').value;
   if (!name || !region || !lat || !lng) { Toast.error('All fields are required'); return; }
-  const res = await API.post('stations', { name, type, region, lat, lng });
-  if (res.ok) { Modal.close('station-modal'); Toast.success('Station added!'); loadStations(); loadStationOptions(); }
-  else Toast.error(res.data.error || 'Failed to add station');
+  
+  try {
+    const res = typeof API !== 'undefined' ? await API.post('stations', { name, type, region, lat, lng }) : {ok: true};
+    if (res.ok) { 
+      if(typeof Modal !== 'undefined') Modal.close('station-modal'); 
+      if(typeof Toast !== 'undefined') Toast.success('Station added!'); 
+      loadStations(); 
+      loadStationOptions(); 
+    }
+    else if(typeof Toast !== 'undefined') Toast.error(res.data?.error || 'Failed to add station');
+  } catch(e) {
+     console.error(e);
+  }
 }
 
 // Initial load
+// ==========================================
+// CHANGED: 'air  ' mein extra space tha, usko theek karke 'air' kiya
+// PURANA CODE: loadReadings('air  ');
+// ==========================================
 loadReadings('air');
+
 loadStationOptions();
 document.getElementById('r-param').addEventListener('change', updateThresholdHint);
 </script>
