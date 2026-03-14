@@ -77,7 +77,7 @@ const OpenAQ={
 
 // ── WAQI with real CG data injection ────────────────────────────────────────
 const WAQI={
-  BASE:'https://api.waqi.info',TOKEN:'demo',
+  BASE:'https://api.waqi.info',TOKEN:'7a7bcc6b778e644f9f3ea2c3ef14b916fdc4fa76',
   async getFeedByGeo(lat,lng){
     // 1. Try OpenAQ
     try{const locs=await OpenAQ.getNearby(lat,lng,30000);if(locs.length>0){const p=OpenAQ.parseLocation(locs[0]);if(p.aqi)return{aqi:p.aqi,iaqi:{pm25:{v:p.pm25},pm10:{v:p.pm10}},city:{name:p.name,geo:[lat,lng]},time:{s:new Date().toISOString()}};}}catch(e){}
